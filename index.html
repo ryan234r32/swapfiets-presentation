@@ -184,7 +184,8 @@ p {
     font-weight: 700;
     letter-spacing: 0.04em;
     color: var(--text-muted);
-    margin-bottom: clamp(0.3rem, 1vw, 1rem);
+    margin-bottom: clamp(0.5rem, 1.5vw, 1.5rem);
+    flex-shrink: 0;
 }
 
 .section-tag span {
@@ -830,12 +831,8 @@ img { max-width: 100%; }
 <section class="slide" style="background:url('images/amsterdam_bikes.jpg') center/cover no-repeat;padding:0;">
     <div style="position:absolute;inset:0;background:rgba(0,0,0,0.55);z-index:1;"></div>
     <div class="slide-content" style="position:relative;z-index:2;align-items:center;justify-content:center;text-align:center;">
-        <div class="section-tag" style="color:rgba(255,255,255,0.7);">
-            <span style="background:var(--danger)"></span>
-            <span style="color:rgba(255,255,255,0.7)">Q1 問題背景</span>
-        </div>
         <h1 style="color:#ffffff;font-size:var(--title-size);">Q1 問題背景</h1>
-        <p style="color:rgba(255,255,255,0.7);font-size:var(--body-size);margin-top:0.5em;">荷蘭自行車天堂的黑暗面</p>
+        <p style="color:rgba(255,255,255,0.7);font-size:var(--h2-size);margin-top:0.5em;">荷蘭自行車天堂的黑暗面</p>
     </div>
 </section>
 
@@ -1177,13 +1174,9 @@ img { max-width: 100%; }
 <!-- ============================================ -->
 <section class="slide" style="background:url('images/student_arriving.jpg') center/cover no-repeat;">
     <div style="position:absolute;inset:0;background:rgba(0,0,0,0.55);z-index:1;"></div>
-    <div class="slide-content" style="position:relative;z-index:2;justify-content:center;align-items:flex-start;">
-        <div class="section-tag" style="color:rgba(255,255,255,0.7);">
-            <span style="background:var(--accent)"></span>
-            <span style="color:rgba(255,255,255,0.7)">Q2 功能面</span>
-        </div>
+    <div class="slide-content" style="position:relative;z-index:2;justify-content:flex-end;align-items:flex-start;padding-bottom:clamp(3rem,8vh,6rem);">
         <h1 style="color:#fff;font-size:var(--title-size);">你是一位 20 歲的大學生</h1>
-        <p style="color:rgba(255,255,255,0.85);font-size:var(--h3-size);margin-top:0.25em;">剛搬到荷蘭 Delft。你需要一台車。</p>
+        <p style="color:rgba(255,255,255,0.85);font-size:var(--h2-size);margin-top:0.25em;">剛搬到荷蘭 Delft。你需要一台車。</p>
     </div>
 </section>
 
@@ -1751,6 +1744,7 @@ img { max-width: 100%; }
         <div class="two-col img-left" style="flex:1;align-items:center;">
             <div style="display:flex;flex-direction:column;align-items:center;gap:var(--element-gap);">
                 <img src="images/01-original-bike-hero.png" style="max-height:min(50vh,400px);width:100%;object-fit:contain;border-radius:clamp(8px,1vw,12px);" alt="Original bike">
+                <a href="https://swapfiets.nl/nl-NL/delft/original" target="_blank" rel="noopener" style="display:inline-block;margin-top:0.5em;padding:0.4em 1.2em;background:var(--accent);color:#fff;border-radius:48px;font-size:var(--small-size);font-weight:700;text-decoration:none;">swapfiets.nl/original →</a>
             </div>
             <div style="display:flex;flex-direction:column;gap:var(--element-gap);">
                 <div class="numbered-item">
@@ -1850,18 +1844,16 @@ img { max-width: 100%; }
         <div class="section-tag" style="color:var(--accent);"><span style="background:var(--accent)"></span>Q2 技術面</div>
         <h2>維護：不只維護車輛，更維護材料循環</h2>
 
-        <div class="two-col" style="flex:1;align-items:stretch;">
-            <div class="card" style="border-left:3px solid var(--accent);display:flex;flex-direction:column;gap:var(--element-gap);">
+        <div class="two-col" style="align-items:start;">
+            <div class="card" style="border-left:3px solid var(--accent);">
                 <h3 style="font-size:var(--h3-size);">日常維護</h3>
-                <p style="font-size:var(--card-size);">磨損包含在訂閱費中，使用者無需額外支付。</p>
-                <p style="font-size:var(--card-size);">Swapper 現場 10 分鐘快修；修不好直接換一台同等級的車。</p>
-                <p style="font-size:var(--card-size);">目標：讓使用者永遠不會因為車的問題中斷日常。</p>
+                <p style="font-size:var(--body-size);margin-top:0.5em;">磨損包含在訂閱費中，無需額外支付。</p>
+                <p style="font-size:var(--body-size);">10 分鐘快修；修不好直接換車。</p>
             </div>
-            <div class="card" style="border-left:3px solid var(--success);display:flex;flex-direction:column;gap:var(--element-gap);">
+            <div class="card" style="border-left:3px solid var(--accent);">
                 <h3 style="font-size:var(--h3-size);">產品生命週期維護</h3>
-                <p style="font-size:var(--card-size);">故障 → 修復 → 重新利用 → 回收。每台車在系統中持續循環。</p>
-                <p style="font-size:var(--card-size);">維修數據回饋設計團隊，每一代車型都根據實際故障模式迭代改進。</p>
-                <p style="font-size:var(--card-size);">Deluxe 7 達 88% 循環度，環境衝擊比傳統車低約 35%。</p>
+                <p style="font-size:var(--body-size);margin-top:0.5em;">故障 → 修復 → 重新利用 → 回收。</p>
+                <p style="font-size:var(--body-size);">維修數據回饋設計，每代車型迭代改進。</p>
             </div>
         </div>
     </div>
