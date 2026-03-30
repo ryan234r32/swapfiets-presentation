@@ -1,0 +1,2870 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Swapfiets — 設計分析：問題、解方與反思</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;700;900&family=Noto+Sans+TC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        /* ==================== Custom Properties ==================== */
+        :root {
+            --bg: #ffffff;
+            --bg-subtle: #f7f7f7;
+            --text: #1a1a1a;
+            --text-secondary: #555555;
+            --text-muted: #999999;
+            --accent: #00A9E0;
+            --accent-light: #EFF6FF;
+            --danger: #DC2626;
+            --danger-light: #FEF2F2;
+            --border: #E5E7EB;
+            --success: #059669;
+            --mint: #74EEB5;
+            --mint-light: #ECFDF5;
+            --gold: #F5C842;
+            --font-display: 'Archivo', 'Noto Sans TC', sans-serif;
+            --font-body: 'Noto Sans TC', sans-serif;
+            --title-size: clamp(2rem, 6vw, 4.5rem);
+            --h2-size: clamp(1.5rem, 4vw, 3rem);
+            --h3-size: clamp(1rem, 2.5vw, 1.5rem);
+            --body-size: clamp(0.95rem, 1.6vw, 1.3rem);
+            --small-size: clamp(0.8rem, 1.2vw, 1.05rem);
+            --big-num: clamp(3rem, 10vw, 7rem);
+            --slide-padding: clamp(1.5rem, 5vw, 5rem);
+            --content-gap: clamp(0.75rem, 2vw, 2rem);
+            --element-gap: clamp(0.3rem, 1vw, 0.75rem);
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+            --duration: 0.6s;
+        }
+
+        /* ==================== viewport-base.css ==================== */
+        html, body { height: 100%; overflow-x: hidden; }
+        html { scroll-snap-type: y mandatory; scroll-behavior: smooth; }
+        .slide { width: 100vw; height: 100vh; height: 100dvh; overflow: hidden; scroll-snap-align: start; display: flex; flex-direction: column; position: relative; }
+        .slide-content { flex: 1; display: flex; flex-direction: column; justify-content: center; max-height: 100%; overflow: hidden; padding: var(--slide-padding); }
+        img, .image-container { max-width: 100%; max-height: min(50vh, 400px); object-fit: contain; }
+        @media (max-height: 700px) { :root { --slide-padding: clamp(0.75rem, 3vw, 2rem); --content-gap: clamp(0.4rem, 1.5vw, 1rem); --title-size: clamp(1.25rem, 4.5vw, 2.5rem); --big-num: clamp(2.5rem, 8vw, 5rem); } }
+        @media (max-height: 600px) { :root { --slide-padding: clamp(0.5rem, 2.5vw, 1.5rem); --content-gap: clamp(0.3rem, 1vw, 0.75rem); --title-size: clamp(1.1rem, 4vw, 2rem); --body-size: clamp(0.7rem, 1.2vw, 0.95rem); } .nav-dots, .keyboard-hint, .decorative { display: none; } }
+        @media (max-height: 500px) { :root { --slide-padding: clamp(0.4rem, 2vw, 1rem); --title-size: clamp(1rem, 3.5vw, 1.5rem); --body-size: clamp(0.65rem, 1vw, 0.85rem); } }
+        @media (max-width: 600px) { :root { --title-size: clamp(1.25rem, 7vw, 2.5rem); } .grid { grid-template-columns: 1fr; } }
+        @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.2s !important; } html { scroll-behavior: auto; } }
+
+        /* ==================== Reset & Base ==================== */
+        *, *::before, *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-body);
+            font-size: var(--body-size);
+            color: var(--text);
+            background: var(--bg);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* ==================== Slide Base ==================== */
+        .slide {
+            background: var(--bg);
+        }
+
+        .slide-content {
+            gap: var(--content-gap);
+        }
+
+        /* ==================== Title Slide ==================== */
+        .title-slide .slide-content {
+            align-items: center;
+            text-align: center;
+            justify-content: center;
+        }
+
+        /* ==================== Section Tag ==================== */
+        .section-tag {
+            position: absolute;
+            top: var(--slide-padding);
+            left: var(--slide-padding);
+            font-family: var(--font-display);
+            font-size: var(--small-size);
+            font-weight: 700;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 0.5em;
+            z-index: 10;
+            letter-spacing: 0.02em;
+        }
+
+        .section-tag::before {
+            content: '';
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-muted);
+            flex-shrink: 0;
+        }
+
+        .section-tag.red::before {
+            background: var(--danger);
+        }
+
+        .section-tag.blue::before {
+            background: var(--accent);
+        }
+
+        .section-tag.orange::before {
+            background: var(--gold);
+        }
+
+        .section-tag.green::before {
+            background: var(--success);
+        }
+
+        /* ==================== Typography ==================== */
+        h1 {
+            font-family: var(--font-display);
+            font-size: var(--title-size);
+            font-weight: 900;
+            line-height: 1.1;
+            letter-spacing: -0.02em;
+            color: var(--text);
+        }
+
+        h2 {
+            font-family: var(--font-display);
+            font-size: var(--h2-size);
+            font-weight: 700;
+            line-height: 1.2;
+            letter-spacing: -0.01em;
+            color: var(--text);
+        }
+
+        h3 {
+            font-family: var(--font-display);
+            font-size: var(--h3-size);
+            font-weight: 700;
+            line-height: 1.3;
+            color: var(--text);
+        }
+
+        p {
+            font-size: var(--body-size);
+            color: var(--text-secondary);
+            line-height: 1.7;
+        }
+
+        .subtitle {
+            font-size: var(--body-size);
+            color: var(--text-secondary);
+            font-weight: 400;
+        }
+
+        .small {
+            font-size: var(--small-size);
+            color: var(--text-muted);
+        }
+
+        /* ==================== Big Numbers ==================== */
+        .big-num {
+            font-family: var(--font-display);
+            font-size: var(--big-num);
+            font-weight: 900;
+            line-height: 1;
+            letter-spacing: -0.03em;
+            color: var(--text);
+        }
+
+        .big-num.blue {
+            color: var(--accent);
+        }
+
+        .big-num.red {
+            color: var(--danger);
+        }
+
+        .big-num.green {
+            color: var(--success);
+        }
+
+        /* ==================== Cards ==================== */
+        .card {
+            background: var(--bg-subtle);
+            border-radius: clamp(8px, 1vw, 12px);
+            padding: clamp(1rem, 2vw, 1.5rem);
+            border: 1px solid var(--border);
+        }
+
+        .card-grid {
+            display: grid;
+            gap: var(--element-gap);
+        }
+
+        .card-grid.cols-2 {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .card-grid.cols-3 {
+            grid-template-columns: 1fr 1fr 1fr;
+        }
+
+        @media (max-width: 600px) {
+            .card-grid.cols-2,
+            .card-grid.cols-3 {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ==================== Two Column Layout ==================== */
+        .two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--content-gap);
+            align-items: start;
+        }
+
+        .two-col.img-left {
+            grid-template-columns: 45% 55%;
+        }
+
+        @media (max-width: 600px) {
+            .two-col,
+            .two-col.img-left {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ==================== Numbered Items ==================== */
+        .numbered-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75em;
+        }
+
+        .item-num {
+            width: 28px;
+            height: 28px;
+            min-width: 28px;
+            border-radius: 50%;
+            background: var(--accent);
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 0.8rem;
+            line-height: 1;
+        }
+
+        /* ==================== Flow / Steps ==================== */
+        .flow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--element-gap);
+            flex-wrap: wrap;
+        }
+
+        .flow-step {
+            padding: 0.5em 1em;
+            border-radius: 8px;
+            font-weight: 700;
+            font-family: var(--font-display);
+            background: var(--bg-subtle);
+            border: 1px solid var(--border);
+            font-size: var(--small-size);
+        }
+
+        .flow-arrow {
+            color: var(--text-muted);
+            font-size: 1.2em;
+            flex-shrink: 0;
+        }
+
+        /* ==================== Text Utilities ==================== */
+        .highlight {
+            color: var(--accent);
+            font-weight: 700;
+        }
+
+        .red {
+            color: var(--danger);
+        }
+
+        .green {
+            color: var(--success);
+        }
+
+        .muted {
+            color: var(--text-muted);
+        }
+
+        /* ==================== Quote Block ==================== */
+        .quote-block {
+            border-left: 4px solid var(--accent);
+            padding: 1em 1.25em;
+            font-style: italic;
+            color: var(--text-secondary);
+            background: var(--accent-light);
+            border-radius: 0 8px 8px 0;
+            font-size: var(--body-size);
+            line-height: 1.7;
+        }
+
+        /* ==================== Stat Block ==================== */
+        .stat-block {
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.25em;
+        }
+
+        .stat-block .label {
+            font-size: var(--small-size);
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        /* ==================== Bar Charts ==================== */
+        .bar-row {
+            display: flex;
+            align-items: center;
+            gap: 0.75em;
+            font-size: var(--small-size);
+        }
+
+        .bar-label {
+            min-width: 6em;
+            text-align: right;
+            font-weight: 500;
+            color: var(--text-secondary);
+            flex-shrink: 0;
+        }
+
+        .bar-track {
+            flex: 1;
+            height: 24px;
+            background: var(--bg-subtle);
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        .bar-fill {
+            height: 100%;
+            border-radius: 12px;
+            background: var(--accent);
+            transition: width var(--duration) var(--ease-out-expo);
+        }
+
+        .bar-fill.red {
+            background: var(--danger);
+        }
+
+        .bar-fill.green {
+            background: var(--success);
+        }
+
+        .bar-fill.gold {
+            background: var(--gold);
+        }
+
+        .bar-value {
+            min-width: 3em;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        /* ==================== Special Cards ==================== */
+        .problem-card {
+            border-left: 4px solid var(--danger);
+            background: var(--danger-light);
+            padding: clamp(0.75rem, 2vw, 1.25rem);
+            border-radius: 0 clamp(8px, 1vw, 12px) clamp(8px, 1vw, 12px) 0;
+        }
+
+        .solution-card {
+            border-left: 4px solid var(--accent);
+            background: var(--accent-light);
+            padding: clamp(0.75rem, 2vw, 1.25rem);
+            border-radius: 0 clamp(8px, 1vw, 12px) clamp(8px, 1vw, 12px) 0;
+        }
+
+        .benefit-card {
+            border-left: 4px solid var(--mint);
+            background: var(--mint-light);
+            padding: clamp(0.75rem, 2vw, 1.25rem);
+            border-radius: 0 clamp(8px, 1vw, 12px) clamp(8px, 1vw, 12px) 0;
+        }
+
+        /* ==================== Concept Tag ==================== */
+        .concept-tag {
+            display: inline-block;
+            font-size: var(--small-size);
+            font-weight: 500;
+            color: var(--accent);
+            background: var(--accent-light);
+            padding: 0.2em 0.75em;
+            border-radius: 999px;
+            letter-spacing: 0.01em;
+        }
+
+        /* ==================== Reveal Animations ==================== */
+        .reveal {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity var(--duration) var(--ease-out-expo),
+                        transform var(--duration) var(--ease-out-expo);
+        }
+
+        .slide.visible .reveal {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .slide.visible .reveal:nth-child(1) { transition-delay: 0.0s; }
+        .slide.visible .reveal:nth-child(2) { transition-delay: 0.1s; }
+        .slide.visible .reveal:nth-child(3) { transition-delay: 0.2s; }
+        .slide.visible .reveal:nth-child(4) { transition-delay: 0.3s; }
+        .slide.visible .reveal:nth-child(5) { transition-delay: 0.4s; }
+        .slide.visible .reveal:nth-child(6) { transition-delay: 0.5s; }
+
+        /* ==================== Background Image / Overlay ==================== */
+        .bg-image {
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+
+        .overlay {
+            position: relative;
+        }
+
+        .overlay::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.55);
+            z-index: 1;
+        }
+
+        .overlay .slide-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        .overlay h1,
+        .overlay h2,
+        .overlay h3,
+        .overlay p,
+        .overlay .subtitle {
+            color: #ffffff;
+        }
+
+        /* ==================== Navigation Dots ==================== */
+        .nav-dots {
+            position: fixed;
+            right: 1.25rem;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 1000;
+        }
+
+        .nav-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--border);
+            border: none;
+            cursor: pointer;
+            transition: background 0.3s ease, transform 0.3s ease;
+            padding: 0;
+        }
+
+        .nav-dot:hover {
+            background: var(--text-muted);
+            transform: scale(1.3);
+        }
+
+        .nav-dot.active {
+            background: var(--accent);
+            transform: scale(1.3);
+        }
+
+        /* ==================== Progress Bar ==================== */
+        .progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 0%;
+            height: 3px;
+            background: var(--accent);
+            z-index: 1000;
+            transition: width 0.3s var(--ease-out-expo);
+        }
+
+        /* ==================== Slide Counter ==================== */
+        .slide-counter {
+            position: fixed;
+            bottom: 1.25rem;
+            right: 1.5rem;
+            font-family: var(--font-display);
+            font-size: var(--small-size);
+            font-weight: 700;
+            color: var(--text-muted);
+            z-index: 1000;
+            letter-spacing: 0.05em;
+        }
+
+        .slide-counter .current {
+            color: var(--text);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Progress Bar -->
+    <div class="progress-bar" id="progressBar"></div>
+
+    <!-- Navigation Dots -->
+    <nav class="nav-dots" id="navDots"></nav>
+
+    <!-- Slide Counter -->
+    <div class="slide-counter" id="slideCounter">
+        <span class="current">01</span> / <span class="total">00</span>
+    </div>
+
+    <!-- ==================== SLIDES START BELOW ==================== -->
+
+    <script>
+    class SlidePresentation {
+        constructor() {
+            this.slides = [];
+            this.currentSlide = 0;
+            this.isScrolling = false;
+            this.touchStartY = 0;
+            this.touchStartX = 0;
+            this.init();
+        }
+
+        init() {
+            // Wait for DOM
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', () => this.setup());
+            } else {
+                this.setup();
+            }
+        }
+
+        setup() {
+            this.slides = Array.from(document.querySelectorAll('.slide'));
+            if (this.slides.length === 0) return;
+
+            this.totalSlides = this.slides.length;
+            this.generateNavDots();
+            this.updateCounter();
+            this.setupIntersectionObserver();
+            this.setupKeyboardNav();
+            this.setupTouchSupport();
+            this.setupScrollListener();
+            this.setupWheelEvent();
+
+            // Mark first slide visible
+            this.slides[0].classList.add('visible');
+            this.updateActiveDot(0);
+        }
+
+        // ---- Intersection Observer ----
+        setupIntersectionObserver() {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('visible');
+                        const index = this.slides.indexOf(entry.target);
+                        if (index !== -1) {
+                            this.currentSlide = index;
+                            this.updateActiveDot(index);
+                            this.updateCounter();
+                            this.updateProgressBar();
+                        }
+                    }
+                });
+            }, {
+                threshold: 0.5
+            });
+
+            this.slides.forEach(slide => observer.observe(slide));
+        }
+
+        // ---- Keyboard Navigation ----
+        setupKeyboardNav() {
+            document.addEventListener('keydown', (e) => {
+                switch (e.key) {
+                    case 'ArrowDown':
+                    case 'ArrowRight':
+                    case ' ':
+                    case 'PageDown':
+                        e.preventDefault();
+                        this.goToSlide(this.currentSlide + 1);
+                        break;
+                    case 'ArrowUp':
+                    case 'ArrowLeft':
+                    case 'PageUp':
+                        e.preventDefault();
+                        this.goToSlide(this.currentSlide - 1);
+                        break;
+                    case 'Home':
+                        e.preventDefault();
+                        this.goToSlide(0);
+                        break;
+                    case 'End':
+                        e.preventDefault();
+                        this.goToSlide(this.totalSlides - 1);
+                        break;
+                }
+            });
+        }
+
+        // ---- Touch / Swipe Support ----
+        setupTouchSupport() {
+            document.addEventListener('touchstart', (e) => {
+                this.touchStartY = e.touches[0].clientY;
+                this.touchStartX = e.touches[0].clientX;
+            }, { passive: true });
+
+            document.addEventListener('touchend', (e) => {
+                const touchEndY = e.changedTouches[0].clientY;
+                const touchEndX = e.changedTouches[0].clientX;
+                const diffY = this.touchStartY - touchEndY;
+                const diffX = this.touchStartX - touchEndX;
+
+                // Only respond to vertical swipes (ignore horizontal)
+                if (Math.abs(diffY) > Math.abs(diffX) && Math.abs(diffY) > 50) {
+                    if (diffY > 0) {
+                        this.goToSlide(this.currentSlide + 1);
+                    } else {
+                        this.goToSlide(this.currentSlide - 1);
+                    }
+                }
+            }, { passive: true });
+        }
+
+        // ---- Wheel Event for Slide Snapping ----
+        setupWheelEvent() {
+            let wheelTimeout;
+            document.addEventListener('wheel', (e) => {
+                if (this.isScrolling) return;
+                clearTimeout(wheelTimeout);
+                wheelTimeout = setTimeout(() => {
+                    if (Math.abs(e.deltaY) > 30) {
+                        if (e.deltaY > 0) {
+                            this.goToSlide(this.currentSlide + 1);
+                        } else {
+                            this.goToSlide(this.currentSlide - 1);
+                        }
+                    }
+                }, 50);
+            }, { passive: true });
+        }
+
+        // ---- Scroll Listener ----
+        setupScrollListener() {
+            window.addEventListener('scroll', () => {
+                this.updateProgressBar();
+            }, { passive: true });
+        }
+
+        // ---- Navigate to Slide ----
+        goToSlide(index) {
+            if (index < 0 || index >= this.totalSlides) return;
+            if (this.isScrolling) return;
+
+            this.isScrolling = true;
+            this.currentSlide = index;
+
+            this.slides[index].scrollIntoView({ behavior: 'smooth' });
+
+            this.updateActiveDot(index);
+            this.updateCounter();
+            this.updateProgressBar();
+
+            setTimeout(() => {
+                this.isScrolling = false;
+            }, 800);
+        }
+
+        // ---- Nav Dots ----
+        generateNavDots() {
+            const container = document.getElementById('navDots');
+            if (!container) return;
+            container.innerHTML = '';
+
+            this.slides.forEach((_, i) => {
+                const dot = document.createElement('button');
+                dot.classList.add('nav-dot');
+                dot.setAttribute('aria-label', `Go to slide ${i + 1}`);
+                dot.addEventListener('click', () => this.goToSlide(i));
+                container.appendChild(dot);
+            });
+        }
+
+        updateActiveDot(index) {
+            const dots = document.querySelectorAll('.nav-dot');
+            dots.forEach((dot, i) => {
+                dot.classList.toggle('active', i === index);
+            });
+        }
+
+        // ---- Slide Counter ----
+        updateCounter() {
+            const currentEl = document.querySelector('.slide-counter .current');
+            const totalEl = document.querySelector('.slide-counter .total');
+            if (currentEl) currentEl.textContent = String(this.currentSlide + 1).padStart(2, '0');
+            if (totalEl) totalEl.textContent = String(this.totalSlides).padStart(2, '0');
+        }
+
+        // ---- Progress Bar ----
+        updateProgressBar() {
+            const bar = document.getElementById('progressBar');
+            if (!bar) return;
+            const progress = this.totalSlides > 1
+                ? (this.currentSlide / (this.totalSlides - 1)) * 100
+                : 0;
+            bar.style.width = progress + '%';
+        }
+    }
+
+    // Initialize
+    const presentation = new SlidePresentation();
+    </script>
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Swapfiets Q1 - Problem Background</title>
+
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700;800;900&family=Noto+Sans+TC:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+<style>
+/* ===========================================
+   CSS CUSTOM PROPERTIES (THEME)
+   =========================================== */
+:root {
+    /* Colors */
+    --bg: #ffffff;
+    --bg-subtle: #f5f7fa;
+    --text: #141414;
+    --text-secondary: #6B6B6B;
+    --text-muted: #9ca3af;
+    --accent: #00A9E0;
+    --danger: #DC2626;
+    --success: #2E7D32;
+    --border: #e5e7eb;
+    --mint: #74EEB5;
+    --gold: #F5C842;
+
+    /* Typography — clamp() for viewport fitting */
+    --font-display: 'Nunito Sans', 'Noto Sans TC', sans-serif;
+    --font-body: 'Noto Sans TC', 'Nunito Sans', sans-serif;
+    --title-size: clamp(2rem, 6vw, 5rem);
+    --h2-size: clamp(1.25rem, 3.5vw, 2.5rem);
+    --h3-size: clamp(1rem, 2.5vw, 1.75rem);
+    --body-size: clamp(0.75rem, 1.5vw, 1.125rem);
+    --small-size: clamp(0.65rem, 1vw, 0.875rem);
+    --big-num: clamp(3rem, 8vw, 7rem);
+
+    /* Spacing */
+    --slide-padding: clamp(1.5rem, 4vw, 4rem);
+    --content-gap: clamp(0.5rem, 2vw, 2rem);
+
+    /* Animation */
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --duration-normal: 0.6s;
+}
+
+/* ===========================================
+   BASE STYLES (viewport-base.css inline)
+   =========================================== */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+    height: 100%;
+    overflow-x: hidden;
+    font-family: var(--font-body);
+    color: var(--text);
+    background: var(--bg);
+}
+
+html {
+    scroll-snap-type: y mandatory;
+    scroll-behavior: smooth;
+}
+
+/* Each slide = exact viewport height */
+.slide {
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    scroll-snap-align: start;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+/* Content container */
+.slide-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    max-height: 100%;
+    overflow: hidden;
+    padding: var(--slide-padding);
+}
+
+/* ===========================================
+   TYPOGRAPHY
+   =========================================== */
+h1 {
+    font-family: var(--font-display);
+    font-size: var(--title-size);
+    font-weight: 900;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    color: var(--text);
+}
+
+h2 {
+    font-family: var(--font-display);
+    font-size: var(--h2-size);
+    font-weight: 900;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    color: var(--text);
+}
+
+h3 {
+    font-family: var(--font-display);
+    font-size: var(--h3-size);
+    font-weight: 700;
+    line-height: 1.3;
+    color: var(--text);
+}
+
+p {
+    font-size: var(--body-size);
+    line-height: 1.6;
+    color: var(--text);
+}
+
+/* ===========================================
+   COMPONENT CLASSES
+   =========================================== */
+
+/* Section tag */
+.section-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--small-size);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    margin-bottom: clamp(0.5rem, 1.5vw, 1.5rem);
+}
+
+.section-tag span {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+/* Big number */
+.big-num {
+    font-family: var(--font-display);
+    font-size: var(--big-num);
+    font-weight: 900;
+    line-height: 1;
+}
+
+/* Color utilities */
+.blue { color: var(--accent); }
+.red { color: var(--danger); }
+
+/* Cards */
+.card {
+    background: var(--bg-subtle);
+    border-radius: 16px;
+    padding: clamp(12px, 2vw, 20px) clamp(16px, 2.5vw, 24px);
+    border: 1px solid var(--border);
+}
+
+.card h3 {
+    font-size: clamp(0.8rem, 1.8vw, 1.1rem);
+    margin-bottom: clamp(4px, 0.5vw, 8px);
+}
+
+.card p {
+    font-size: var(--small-size);
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+/* Card grid */
+.card-grid {
+    display: grid;
+    gap: clamp(8px, 1.5vw, 16px);
+}
+
+.cols-2 { grid-template-columns: 1fr 1fr; }
+.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+
+/* Two column layout */
+.two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: clamp(16px, 3vw, 32px);
+    align-items: center;
+}
+
+/* Flow */
+.flow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(6px, 1vw, 12px);
+    flex-wrap: wrap;
+}
+
+.flow-step {
+    padding: clamp(8px, 1vw, 14px) clamp(12px, 1.5vw, 20px);
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: var(--small-size);
+    text-align: center;
+}
+
+.flow-arrow {
+    font-size: clamp(1rem, 2vw, 1.5rem);
+    color: var(--text-muted);
+}
+
+/* Numbered item */
+.numbered-item {
+    display: flex;
+    align-items: flex-start;
+    gap: clamp(8px, 1vw, 14px);
+    margin-bottom: clamp(4px, 0.6vw, 8px);
+}
+
+.item-num {
+    width: clamp(24px, 3vw, 32px);
+    height: clamp(24px, 3vw, 32px);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: var(--small-size);
+    flex-shrink: 0;
+}
+
+/* Highlight */
+.highlight {
+    color: var(--accent);
+    font-weight: 700;
+}
+
+/* Quote block */
+.quote-block {
+    background: var(--bg-subtle);
+    border-left: 4px solid var(--mint);
+    padding: clamp(12px, 2vw, 20px) clamp(16px, 2.5vw, 28px);
+    border-radius: 0 16px 16px 0;
+    font-size: clamp(0.85rem, 1.5vw, 1.1rem);
+    line-height: 1.6;
+    font-style: italic;
+}
+
+/* Stat block */
+.stat-block {
+    text-align: center;
+}
+
+/* Reveal animation */
+.reveal {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity var(--duration-normal) var(--ease-out-expo),
+                transform var(--duration-normal) var(--ease-out-expo);
+}
+
+.slide.visible .reveal {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.reveal:nth-child(1) { transition-delay: 0.1s; }
+.reveal:nth-child(2) { transition-delay: 0.2s; }
+.reveal:nth-child(3) { transition-delay: 0.3s; }
+.reveal:nth-child(4) { transition-delay: 0.4s; }
+.reveal:nth-child(5) { transition-delay: 0.5s; }
+
+/* Overlay for dark bg images */
+.overlay::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(10, 18, 26, 0.75);
+    z-index: 1;
+}
+
+.overlay > * {
+    position: relative;
+    z-index: 2;
+}
+
+/* Background image slide */
+.bg-image {
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+/* Concept tag */
+.concept-tag {
+    display: inline-block;
+    background: rgba(0, 169, 224, 0.08);
+    color: var(--accent);
+    font-size: var(--small-size);
+    font-weight: 600;
+    padding: 4px 14px;
+    border-radius: 48px;
+}
+
+/* Bar chart rows */
+.bar-row {
+    display: flex;
+    align-items: center;
+    gap: clamp(8px, 1vw, 12px);
+    margin-bottom: clamp(6px, 0.8vw, 10px);
+}
+
+.bar-row .bar-label {
+    width: clamp(50px, 6vw, 80px);
+    text-align: right;
+    font-size: var(--small-size);
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.bar-track {
+    flex: 1;
+    height: clamp(20px, 3vh, 32px);
+    background: var(--bg-subtle);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.bar-fill {
+    height: 100%;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    padding-left: 10px;
+    font-size: var(--small-size);
+    font-weight: 700;
+    color: #fff;
+}
+
+/* ===========================================
+   RESPONSIVE BREAKPOINTS
+   =========================================== */
+@media (max-height: 700px) {
+    :root {
+        --slide-padding: clamp(0.75rem, 3vw, 2rem);
+        --content-gap: clamp(0.4rem, 1.5vw, 1rem);
+        --title-size: clamp(1.25rem, 4.5vw, 2.5rem);
+        --h2-size: clamp(1rem, 3vw, 1.75rem);
+        --big-num: clamp(2.5rem, 7vw, 5rem);
+    }
+}
+
+@media (max-height: 600px) {
+    :root {
+        --slide-padding: clamp(0.5rem, 2.5vw, 1.5rem);
+        --content-gap: clamp(0.3rem, 1vw, 0.75rem);
+        --title-size: clamp(1.1rem, 4vw, 2rem);
+        --body-size: clamp(0.7rem, 1.2vw, 0.95rem);
+        --big-num: clamp(2rem, 6vw, 4rem);
+    }
+}
+
+@media (max-width: 600px) {
+    .cols-3 { grid-template-columns: 1fr; }
+    .cols-2 { grid-template-columns: 1fr; }
+    .two-col { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.2s !important;
+    }
+    html { scroll-behavior: auto; }
+}
+
+/* ===========================================
+   SLIDE-SPECIFIC STYLES
+   =========================================== */
+
+/* Slide 1: Title */
+.slide-title .slide-content {
+    flex-direction: row;
+    align-items: center;
+    gap: clamp(2rem, 5vw, 5rem);
+}
+
+.slide-title .title-block {
+    flex: 1;
+    position: relative;
+    padding-left: clamp(20px, 3vw, 40px);
+}
+
+.slide-title .title-block::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    background: var(--accent);
+    border-radius: 3px;
+}
+
+.slide-title .hero-image {
+    flex: 0 0 auto;
+    max-width: 40%;
+}
+
+.slide-title .hero-image img {
+    max-height: min(50vh, 400px);
+    width: auto;
+    object-fit: contain;
+    border-radius: 16px;
+}
+
+.slide-title h1 {
+    font-size: clamp(3rem, 8vw, 7rem);
+    letter-spacing: -0.03em;
+}
+
+.slide-title .subtitle {
+    font-size: clamp(1rem, 2.2vw, 1.5rem);
+    color: var(--text-secondary);
+    margin-top: clamp(8px, 1.5vw, 16px);
+    font-weight: 500;
+}
+
+/* Slide 2: Section divider */
+.slide-divider {
+    padding: 0;
+}
+
+.slide-divider .slide-content {
+    padding: 0;
+    justify-content: stretch;
+}
+
+.slide-divider .divider-image {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+}
+
+.slide-divider .divider-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.slide-divider .divider-image::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(10, 18, 26, 0.6);
+}
+
+.slide-divider .divider-label {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: clamp(24px, 5vh, 60px) var(--slide-padding);
+    background: var(--bg);
+}
+
+.slide-divider .divider-label .section-tag {
+    font-size: clamp(1.2rem, 3vw, 2rem);
+    margin-bottom: 0;
+}
+
+/* Slide 3: Big numbers */
+.numbers-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(16px, 4vw, 48px);
+    margin: clamp(12px, 3vh, 32px) 0;
+}
+
+.num-block {
+    text-align: center;
+}
+
+.num-block .num-value {
+    font-family: var(--font-display);
+    font-size: clamp(2.5rem, 7vw, 5.5rem);
+    font-weight: 900;
+    line-height: 1;
+}
+
+.num-block .num-label {
+    display: block;
+    font-size: clamp(0.9rem, 1.8vw, 1.3rem);
+    font-weight: 700;
+    margin-top: clamp(4px, 1vh, 12px);
+}
+
+.num-block .num-sub {
+    display: block;
+    font-size: var(--small-size);
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+.vs-divider {
+    font-size: clamp(1.2rem, 2.5vw, 2rem);
+    font-weight: 300;
+    color: var(--text-muted);
+}
+
+.footer-note {
+    text-align: center;
+    font-size: var(--small-size);
+    color: var(--text-muted);
+    margin-top: clamp(8px, 2vh, 20px);
+    padding-top: clamp(8px, 1.5vh, 16px);
+    border-top: 1px solid var(--border);
+}
+
+/* Slide 4: Cycle */
+.cycle-flow {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: clamp(4px, 0.8vw, 8px);
+    flex-wrap: wrap;
+    margin: clamp(8px, 1.5vh, 16px) 0;
+}
+
+.cycle-step {
+    padding: clamp(6px, 0.8vw, 10px) clamp(10px, 1.2vw, 16px);
+    border-radius: 10px;
+    font-size: var(--small-size);
+    font-weight: 600;
+    background: var(--bg-subtle);
+    border: 1px solid var(--border);
+}
+
+.cycle-step.danger {
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+.cycle-arrow {
+    font-size: clamp(0.9rem, 1.5vw, 1.3rem);
+    color: var(--text-muted);
+}
+
+.persona-cards {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(4px, 0.5vh, 8px);
+    margin-top: clamp(8px, 1.5vh, 16px);
+}
+
+.persona-card {
+    background: var(--bg-subtle);
+    padding: clamp(6px, 1vw, 10px) clamp(10px, 1.5vw, 16px);
+    border-radius: 10px;
+    border: 1px solid var(--border);
+}
+
+.persona-card h3 {
+    font-size: var(--small-size);
+    margin-bottom: 2px;
+}
+
+.persona-card p {
+    font-size: clamp(0.6rem, 0.9vw, 0.8rem);
+    color: var(--text-secondary);
+}
+
+/* Slide 5: Quote */
+.slide-quote .quote-text {
+    font-size: clamp(1rem, 2.2vw, 1.6rem);
+    line-height: 1.7;
+    font-style: italic;
+    color: var(--text);
+    max-width: 800px;
+}
+
+.slide-quote .quote-text .gold {
+    color: var(--gold);
+    font-weight: 700;
+}
+
+.slide-quote .attribution {
+    font-size: var(--small-size);
+    color: var(--text-muted);
+    font-style: normal;
+    margin-top: clamp(8px, 1.5vh, 16px);
+}
+
+.slide-quote .stat-row {
+    display: flex;
+    align-items: baseline;
+    gap: clamp(8px, 1.5vw, 16px);
+    margin-top: clamp(16px, 3vh, 32px);
+    padding-top: clamp(12px, 2vh, 24px);
+    border-top: 1px solid var(--border);
+}
+
+.slide-quote .stat-row .big-pct {
+    font-family: var(--font-display);
+    font-size: clamp(2.5rem, 6vw, 4.5rem);
+    font-weight: 900;
+    color: var(--accent);
+    line-height: 1;
+}
+
+.slide-quote .stat-row .stat-text {
+    font-size: var(--body-size);
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+/* Slide 7: Take-Make-Waste */
+.tmw-flow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(8px, 1.5vw, 16px);
+    margin: clamp(12px, 2vh, 24px) 0;
+}
+
+.tmw-box {
+    padding: clamp(10px, 1.5vw, 18px) clamp(16px, 2.5vw, 28px);
+    border-radius: 14px;
+    font-weight: 800;
+    font-size: clamp(0.8rem, 1.5vw, 1.1rem);
+    text-align: center;
+}
+
+/* Slide 8: Externality columns */
+.ext-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: clamp(8px, 1.5vw, 16px);
+    margin: clamp(8px, 1.5vh, 16px) 0;
+}
+
+.ext-col {
+    background: var(--bg-subtle);
+    padding: clamp(12px, 2vw, 20px) clamp(14px, 2vw, 20px);
+    border-radius: 16px;
+    border: 1px solid var(--border);
+}
+
+.ext-col h4 {
+    font-size: clamp(0.8rem, 1.5vw, 1rem);
+    font-weight: 800;
+    color: var(--text);
+    margin-bottom: clamp(4px, 0.8vh, 10px);
+    padding-bottom: clamp(4px, 0.5vh, 8px);
+    border-bottom: 2px solid var(--accent);
+    display: inline-block;
+}
+
+.ext-col p {
+    font-size: var(--small-size);
+    line-height: 1.6;
+    color: var(--text-secondary);
+    margin-top: clamp(2px, 0.3vh, 4px);
+}
+
+/* Slide 10: Dark bg with cards */
+.slide-dark-cards .overlay-content {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    padding: var(--slide-padding);
+    text-align: center;
+}
+
+.slide-dark-cards h2 {
+    color: #fff;
+    margin-bottom: clamp(16px, 3vh, 32px);
+}
+
+.dark-cards-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: clamp(8px, 1.5vw, 16px);
+    width: 100%;
+    max-width: 900px;
+}
+
+.dark-card {
+    background: rgba(255, 255, 255, 0.93);
+    border-radius: 16px;
+    padding: clamp(12px, 2vw, 20px) clamp(14px, 2vw, 20px);
+}
+
+.dark-card h3 {
+    font-size: clamp(0.85rem, 1.5vw, 1.1rem);
+    margin-bottom: clamp(4px, 0.5vh, 8px);
+}
+
+.dark-card p {
+    font-size: var(--small-size);
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+/* Slide 11: Ownership comparison */
+.ownership-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px;
+    border-radius: 16px;
+    overflow: hidden;
+    margin: clamp(8px, 2vh, 20px) 0;
+}
+
+.own-col {
+    padding: clamp(16px, 2.5vw, 28px) clamp(18px, 2.5vw, 28px);
+}
+
+.own-col.left {
+    background: var(--bg-subtle);
+}
+
+.own-col.right {
+    background: #fef2f2;
+}
+
+.own-col h3 {
+    font-size: clamp(0.9rem, 1.8vw, 1.2rem);
+    margin-bottom: clamp(6px, 1vh, 12px);
+}
+
+.own-col p {
+    font-size: var(--small-size);
+    line-height: 1.7;
+    color: var(--text-secondary);
+}
+
+.question-block {
+    text-align: center;
+    margin-top: clamp(12px, 2.5vh, 28px);
+    padding-top: clamp(12px, 2vh, 24px);
+    border-top: 1px solid var(--border);
+}
+
+.question-block p.big-q {
+    font-size: clamp(1.1rem, 2.5vw, 1.8rem);
+    font-weight: 800;
+    color: var(--text);
+}
+
+.question-block p.sub-q {
+    font-size: var(--small-size);
+    color: var(--text-secondary);
+    margin-top: clamp(4px, 0.8vh, 10px);
+    line-height: 1.6;
+}
+
+/* ===========================================
+   NAVIGATION & PROGRESS
+   =========================================== */
+.progress-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 3px;
+    background: var(--accent);
+    z-index: 9999;
+    transition: width 0.3s ease;
+    width: 0%;
+}
+
+.nav-dots {
+    position: fixed;
+    right: clamp(12px, 2vw, 24px);
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 9998;
+}
+
+.nav-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    opacity: 0.3;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: none;
+    padding: 0;
+}
+
+.nav-dot.active {
+    opacity: 1;
+    background: var(--accent);
+    transform: scale(1.3);
+}
+
+.keyboard-hint {
+    position: fixed;
+    bottom: clamp(8px, 1.5vh, 16px);
+    right: clamp(12px, 2vw, 24px);
+    font-size: clamp(0.55rem, 0.8vw, 0.7rem);
+    color: var(--text-muted);
+    z-index: 9998;
+    opacity: 0.5;
+}
+</style>
+</head>
+<body>
+
+<!-- Progress bar -->
+<div class="progress-bar" id="progressBar"></div>
+
+<!-- Navigation dots -->
+<nav class="nav-dots" id="navDots"></nav>
+
+<!-- Keyboard hint -->
+<div class="keyboard-hint">Arrow keys to navigate</div>
+
+
+<!-- ============================================ -->
+<!--  SLIDE 1: Title                              -->
+<!-- ============================================ -->
+<section class="slide slide-title">
+    <div class="slide-content">
+        <div class="title-block reveal">
+            <h1>Swapfiets</h1>
+            <p class="subtitle">設計分析：問題、解方與反思</p>
+        </div>
+        <div class="hero-image reveal">
+            <img src="images/01-original-bike-hero.png" alt="Swapfiets Original bike">
+        </div>
+    </div>
+</section>
+
+
+<!-- ============================================ -->
+<!--  SLIDE 2: Q1 Section Divider                 -->
+<!-- ============================================ -->
+<section class="slide slide-divider">
+    <div class="slide-content">
+        <div class="divider-image">
+            <img src="images/amsterdam_bikes.jpg" alt="Amsterdam bikes">
+        </div>
+        <div class="divider-label">
+            <div class="section-tag" style="color:var(--danger)">
+                <span style="background:var(--danger)"></span>Q1 問題背景
+            </div>
+        </div>
+    </div>
+</section>
+
+
+<!-- ============================================ -->
+<!--  SLIDE 3: 荷蘭自行車天堂的黑暗面             -->
+<!-- ============================================ -->
+<section class="slide">
+    <div class="slide-content">
+        <div class="section-tag reveal" style="color:var(--danger)">
+            <span style="background:var(--danger)"></span>Q1 問題背景
+        </div>
+
+        <h2 class="reveal">荷蘭自行車天堂的黑暗面</h2>
+
+        <div class="numbers-row reveal">
+            <div class="num-block">
+                <span class="num-value" style="color:var(--text)">2,300<small style="font-size:0.4em">萬輛</small></span>
+                <span class="num-label">自行車</span>
+                <span class="num-sub">全球人均最高</span>
+            </div>
+            <div class="vs-divider">vs</div>
+            <div class="num-block">
+                <span class="num-value blue">93<small style="font-size:0.4em">萬輛/年</small></span>
+                <span class="num-label">被偷</span>
+                <span class="num-sub">每 34 秒丟一台</span>
+            </div>
+        </div>
+
+        <div class="footer-note reveal">
+            損失 &euro;6.98 億/年（汽車竊盜的 4 倍）｜只有 14-17% 報案
+        </div>
+    </div>
+</section>
+
+
+<!-- ============================================ -->
+<!--  SLIDE 4: 使用者的惡性循環                    -->
+<!-- ============================================ -->
+<section class="slide">
+    <div class="slide-content">
+        <div class="section-tag reveal" style="color:var(--danger)">
+            <span style="background:var(--danger)"></span>Q1 問題背景
+        </div>
+
+        <h2 class="reveal">使用者的惡性循環</h2>
+
+        <div class="two-col reveal" style="align-items:start;">
+            <div>
+                <div class="cycle-flow">
+                    <span class="cycle-step danger">車被偷</span>
+                    <span class="cycle-arrow">&rarr;</span>
+                    <span class="cycle-step">買便宜爛車</span>
+                    <span class="cycle-arrow">&rarr;</span>
+                    <span class="cycle-step">車壞了修不划算</span>
+                    <span class="cycle-arrow">&rarr;</span>
+                    <span class="cycle-step danger">丟掉再買</span>
+                    <span class="cycle-arrow">&rarr;</span>
+                    <span class="cycle-step danger">又被偷 &#x27F3;</span>
+                </div>
+
+                <div class="persona-cards">
+                    <div class="persona-card">
+                        <h3>大學生 / 留學生</h3>
+                        <p>預算有限，被偷心疼，畢業還要處理車</p>
+                    </div>
+                    <div class="persona-card">
+                        <h3>外派 / 新移民</h3>
+                        <p>短期居留買車不划算，不熟修車管道</p>
+                    </div>
+                    <div class="persona-card">
+                        <h3>城市通勤者</h3>
+                        <p>只要「隨時能騎」，擁有車反而是負擔</p>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display:flex;justify-content:center;">
+                <img src="images/frustrated_repair.jpg" alt="Frustrated repair"
+                     style="max-height:min(50vh,400px);width:auto;object-fit:contain;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+            </div>
+        </div>
+    </div>
+</section>
+
+
+<!-- ============================================ -->
+<!--  SLIDE 5: Student Quote                      -->
+<!-- ============================================ -->
+<section class="slide slide-quote">
+    <div class="slide-content">
+        <div class="section-tag reveal" style="color:var(--danger)">
+            <span style="background:var(--danger)"></span>Q1 問題背景
+        </div>
+
+        <div class="quote-block reveal" style="border-left-color:var(--gold);background:rgba(245,200,66,0.06);">
+            <p class="quote-text" style="font-size:clamp(1rem, 2.2vw, 1.5rem);">
+                「我在陽台上修車，零件散一地，根本是場災難。我跟自己說：<span class="gold">下次再壞，我就不修了。</span>」
+            </p>
+            <p class="attribution">&mdash; Delft 理工大學學生</p>
+        </div>
+
+        <div class="stat-row reveal" style="display:flex;align-items:baseline;gap:clamp(8px,1.5vw,16px);margin-top:clamp(16px,3vh,32px);padding-top:clamp(12px,2vh,24px);border-top:1px solid var(--border);">
+            <span class="big-pct" style="font-family:var(--font-display);font-size:clamp(2.5rem,6vw,4.5rem);font-weight:900;color:var(--accent);line-height:1;">50%</span>
+            <div>
+                <p style="font-size:var(--body-size);font-weight:700;color:var(--text);">近 50% 的學生是 Swapfiets 會員</p>
+                <p style="font-size:var(--small-size);color:var(--text-secondary);margin-top:4px;line-height:1.5;">
+                    選擇訂閱不是因為買不起車，而是不想再處理車壞掉的那些事
+                </p>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+<!-- ============================================ -->
+<!--  SLIDE 6: 產業三層問題                        -->
+<!-- ============================================ -->
+<section class="slide">
+    <div class="slide-content">
+        <div class="section-tag reveal" style="color:var(--danger)">
+            <span style="background:var(--danger)"></span>Q1 問題背景
+        </div>
+
+        <h2 class="reveal" style="text-align:center;">
+            自行車號稱「綠色交通工具」，<br>但整個產業<span class="red">一點都不綠</span>。
+        </h2>
+
+        <div class="card-grid cols-3 reveal" style="margin-top:clamp(16px,3vh,32px);">
+            <div class="card" style="border-left:3px solid var(--danger);">
+                <h3 style="color:var(--danger);">第一層：線性經濟</h3>
+                <p>賣越多、丟越多。車廠的利潤建立在不斷消耗與報廢之上。</p>
+            </div>
+            <div class="card" style="border-left:3px solid var(--accent);">
+                <h3 style="color:var(--accent);">第二層：外部性轉嫁</h3>
+                <p>問題不是消失了，只是你看不見。汙染與碳排被轉移到其他國家和未來世代。</p>
+            </div>
+            <div class="card" style="border-left:3px solid var(--text-muted);">
+                <h3>第三層：責任稀釋</h3>
+                <p>供應鏈拉到幾十個國家，出事了沒人負全責。</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+<!-- ============================================ -->
+<!--  SLIDE 7: Take-Make-Waste                    -->
+<!-- ============================================ -->
+<section class="slide">
+    <div class="slide-content">
+        <div class="section-tag reveal" style="color:var(--danger)">
+            <span style="background:var(--danger)"></span>Q1 問題背景
+        </div>
+
+        <div class="reveal" style="text-align:center;">
+            <span class="big-num red">1,500<small style="font-size:0.35em;font-weight:700;">萬輛/年</small></span>
+            <p style="font-size:clamp(0.9rem,1.8vw,1.3rem);font-weight:700;margin-top:clamp(4px,0.8vh,10px);">自行車進垃圾場</p>
+        </div>
+
+        <div class="tmw-flow reveal">
+            <div class="tmw-box" style="background:#fecaca;color:#991b1b;">挖原料 Take</div>
+            <span class="flow-arrow">&rarr;</span>
+            <div class="tmw-box" style="background:#fef3c7;color:#92400e;">做成車 Make</div>
+            <span class="flow-arrow">&rarr;</span>
+            <div class="tmw-box" style="background:#d6d3d1;color:#44403c;">用壞就丟 Waste</div>
+        </div>
+
+        <p class="reveal" style="text-align:center;font-size:var(--body-size);margin-top:clamp(8px,1.5vh,16px);">
+            傳統車廠的獲利邏輯：<span class="red" style="font-weight:700;">車壞了 = 你再買一台 = 他們賺更多</span>
+        </p>
+    </div>
+</section>
+
+
+<!-- ============================================ -->
+<!--  SLIDE 8: 外部性三種隱藏方式                  -->
+<!-- ============================================ -->
+<section class="slide">
+    <div class="slide-content">
+        <div class="section-tag reveal" style="color:var(--danger)">
+            <span style="background:var(--danger)"></span>Q1 問題背景
+        </div>
+
+        <h2 class="reveal">外部性的三種隱藏方式</h2>
+
+        <div class="ext-cols reveal">
+            <div class="ext-col">
+                <h4>空間轉移</h4>
+                <p>鋁在澳洲開採、中國組裝</p>
+                <p>你在荷蘭騎的是一台「看不見代價」的車</p>
+            </div>
+            <div class="ext-col">
+                <h4>時間推遲</h4>
+                <p>塑膠零件需 31 年才降解</p>
+                <p>碳排後果由下一代承擔</p>
+            </div>
+            <div class="ext-col">
+                <h4>責任稀釋</h4>
+                <p>品牌說是代工廠的問題</p>
+                <p>代工廠說是原料商的問題</p>
+                <p>最後沒有人負全責</p>
+            </div>
+        </div>
+
+        <div class="quote-block reveal" style="font-size:var(--body-size);margin-top:clamp(8px,1.5vh,16px);">
+            「丟掉」不是消失，只是離開你的視線。&mdash; Papanek
+        </div>
+    </div>
+</section>
+
+
+<!-- ============================================ -->
+<!--  SLIDE 9: 隱藏碳排                            -->
+<!-- ============================================ -->
+<section class="slide">
+    <div class="slide-content">
+        <div class="section-tag reveal" style="color:var(--danger)">
+            <span style="background:var(--danger)"></span>Q1 問題背景
+        </div>
+
+        <h2 class="reveal">製造的隱藏碳排</h2>
+        <p class="reveal" style="font-size:var(--small-size);color:var(--text-muted);margin-bottom:clamp(6px,1vh,12px);">每公斤材料的 CO&#x2082; 排放量</p>
+
+        <div class="reveal" style="margin-bottom:clamp(10px,2vh,20px);">
+            <div class="bar-row">
+                <span class="bar-label">鋼</span>
+                <div class="bar-track">
+                    <div class="bar-fill" style="width:8%;min-width:40px;background:#78909c;">1.9 kg</div>
+                </div>
+            </div>
+            <div class="bar-row">
+                <span class="bar-label">原生鋁</span>
+                <div class="bar-track">
+                    <div class="bar-fill" style="width:72%;background:var(--accent);">18 kg</div>
+                </div>
+            </div>
+            <div class="bar-row">
+                <span class="bar-label">碳纖維</span>
+                <div class="bar-track">
+                    <div class="bar-fill" style="width:100%;background:var(--danger);">25+ kg</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-grid cols-2 reveal">
+            <div class="card" style="border-left:3px solid var(--danger);">
+                <h3 style="color:var(--danger);">44,000 噸橡膠</h3>
+                <p>光是英國，每年進掩埋場的自行車橡膠量</p>
+            </div>
+            <div class="card" style="border-left:3px solid var(--danger);">
+                <h3 style="color:var(--danger);">碳纖維回收更耗能</h3>
+                <p>回收消耗的能源比製造新的還多</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+<!-- ============================================ -->
+<!--  SLIDE 10: 共享單車失敗                       -->
+<!-- ============================================ -->
+<section class="slide slide-dark-cards bg-image overlay"
+         style="background-image:url('images/bike_graveyard.jpg');">
+    <div class="overlay-content">
+        <div class="section-tag reveal" style="color:rgba(220,38,38,0.8);">
+            <span style="background:var(--danger)"></span>
+            <span style="color:rgba(255,255,255,0.7);">Q1 問題背景</span>
+        </div>
+
+        <h2 class="reveal" style="color:#fff;font-size:var(--h2-size);">
+            「解決問題的設計，反而製造了更大的問題」
+        </h2>
+
+        <div class="dark-cards-row reveal">
+            <div class="dark-card">
+                <h3>中國</h3>
+                <p>北京承載量 120 萬輛，實際投放 235 萬輛。Ofo 燒 $22 億後破產，1,600 萬人排隊退押金。</p>
+            </div>
+            <div class="dark-card">
+                <h3>巴黎</h3>
+                <p>V&eacute;lib' 兩年後 80% 車被毀或偷走。2025 年仍每週 600 輛失蹤。</p>
+            </div>
+            <div class="dark-card">
+                <h3>台灣</h3>
+                <p>oBike 無樁投放，亂停成災，最終退出市場。</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+<!-- ============================================ -->
+<!--  SLIDE 11: 誰擁有這台車？                     -->
+<!-- ============================================ -->
+<section class="slide">
+    <div class="slide-content">
+        <div class="section-tag reveal" style="color:var(--danger)">
+            <span style="background:var(--danger)"></span>Q1 問題背景
+        </div>
+
+        <h2 class="reveal" style="text-align:center;">核心問題：誰擁有這台車？</h2>
+
+        <div class="ownership-cols reveal">
+            <div class="own-col left">
+                <h3>自己買的車</h3>
+                <p>你擁有、你珍惜<br>但所有風險你扛 &mdash; 被偷、壞了、報廢<br>車廠賣完就不管了（線性經濟）</p>
+            </div>
+            <div class="own-col right">
+                <h3>共享單車</h3>
+                <p>沒人擁有，沒人珍惜<br>沒人負責它的善終（單車墳場）<br>平台只管投放不管回收</p>
+            </div>
+        </div>
+
+        <div class="question-block reveal">
+            <p class="big-q">那有沒有第三種可能？</p>
+            <p class="sub-q">
+                你不用扛擁有的麻煩，但車也不會變成沒人管的廢鐵 &mdash;<br>
+                從設計、製造、使用到回收，整條鏈都有人負責到底？
+            </p>
+        </div>
+    </div>
+</section>
+
+
+<!-- ============================================ -->
+<!--  JAVASCRIPT: Slide Controller                -->
+<!-- ============================================ -->
+<script>
+class SlidePresentation {
+    constructor() {
+        this.slides = document.querySelectorAll('.slide');
+        this.currentSlide = 0;
+        this.isScrolling = false;
+
+        this.setupIntersectionObserver();
+        this.setupKeyboardNav();
+        this.setupTouchNav();
+        this.setupWheelNav();
+        this.setupProgressBar();
+        this.setupNavDots();
+    }
+
+    setupIntersectionObserver() {
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                    const index = Array.from(this.slides).indexOf(entry.target);
+                    if (index !== -1) {
+                        this.currentSlide = index;
+                        this.updateProgressBar();
+                        this.updateNavDots();
+                    }
+                }
+            });
+        }, {
+            threshold: 0.5
+        });
+
+        this.slides.forEach(slide => observer.observe(slide));
+    }
+
+    setupKeyboardNav() {
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+                e.preventDefault();
+                this.goToSlide(this.currentSlide + 1);
+            } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'PageUp') {
+                e.preventDefault();
+                this.goToSlide(this.currentSlide - 1);
+            } else if (e.key === 'Home') {
+                e.preventDefault();
+                this.goToSlide(0);
+            } else if (e.key === 'End') {
+                e.preventDefault();
+                this.goToSlide(this.slides.length - 1);
+            }
+        });
+    }
+
+    setupTouchNav() {
+        let startY = 0;
+        let startX = 0;
+
+        document.addEventListener('touchstart', (e) => {
+            startY = e.touches[0].clientY;
+            startX = e.touches[0].clientX;
+        }, { passive: true });
+
+        document.addEventListener('touchend', (e) => {
+            const deltaY = startY - e.changedTouches[0].clientY;
+            const deltaX = startX - e.changedTouches[0].clientX;
+
+            if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > 50) {
+                if (deltaY > 0) {
+                    this.goToSlide(this.currentSlide + 1);
+                } else {
+                    this.goToSlide(this.currentSlide - 1);
+                }
+            }
+        }, { passive: true });
+    }
+
+    setupWheelNav() {
+        let lastWheelTime = 0;
+        document.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const now = Date.now();
+            if (now - lastWheelTime < 800) return;
+            lastWheelTime = now;
+
+            if (e.deltaY > 0) {
+                this.goToSlide(this.currentSlide + 1);
+            } else if (e.deltaY < 0) {
+                this.goToSlide(this.currentSlide - 1);
+            }
+        }, { passive: false });
+    }
+
+    setupProgressBar() {
+        this.progressBar = document.getElementById('progressBar');
+        this.updateProgressBar();
+    }
+
+    updateProgressBar() {
+        if (!this.progressBar) return;
+        const progress = ((this.currentSlide + 1) / this.slides.length) * 100;
+        this.progressBar.style.width = progress + '%';
+    }
+
+    setupNavDots() {
+        const container = document.getElementById('navDots');
+        if (!container) return;
+
+        this.slides.forEach((_, i) => {
+            const dot = document.createElement('button');
+            dot.className = 'nav-dot' + (i === 0 ? ' active' : '');
+            dot.setAttribute('aria-label', `Go to slide ${i + 1}`);
+            dot.addEventListener('click', () => this.goToSlide(i));
+            container.appendChild(dot);
+        });
+
+        this.dots = container.querySelectorAll('.nav-dot');
+    }
+
+    updateNavDots() {
+        if (!this.dots) return;
+        this.dots.forEach((dot, i) => {
+            dot.classList.toggle('active', i === this.currentSlide);
+        });
+    }
+
+    goToSlide(index) {
+        if (index < 0 || index >= this.slides.length) return;
+        this.currentSlide = index;
+        this.slides[index].scrollIntoView({ behavior: 'smooth' });
+        this.updateProgressBar();
+        this.updateNavDots();
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    new SlidePresentation();
+});
+</script>
+</body>
+</html>
+<!-- ============================================ -->
+<!--  Q2：功能面 — User Journey + Problems        -->
+<!-- ============================================ -->
+
+<!-- F0: Section Divider -->
+<section class="slide" style="background:#0f1923">
+    <div class="slide-content" style="align-items:center;text-align:center;justify-content:center">
+        <p style="font-size:var(--small-size);font-weight:700;color:var(--accent);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:0.5em">Q2 -- 功能面</p>
+        <h1 style="color:#ffffff;font-size:var(--title-size);max-width:14em">那 Swapfiets 到底怎麼做的？</h1>
+    </div>
+</section>
+
+<!-- F1: Scenario — 你是一位 20 歲的大學生 -->
+<section class="slide bg-image overlay" style="background-image:url('images/student_arriving.jpg')">
+    <div class="slide-content" style="justify-content:center;align-items:flex-start">
+        <div class="section-tag blue" style="color:rgba(255,255,255,0.7)">Q2 功能面</div>
+        <h1 class="reveal" style="color:#fff;font-size:var(--title-size)">你是一位 20 歲的大學生</h1>
+        <p class="reveal" style="color:rgba(255,255,255,0.85);font-size:var(--h3-size);margin-top:0.25em">剛搬到荷蘭 Delft。你需要一台車。</p>
+    </div>
+</section>
+
+<!-- F2: Choose Plan -->
+<section class="slide">
+    <div class="slide-content" style="justify-content:center">
+        <div class="section-tag blue">Q2 功能面</div>
+        <h2 class="reveal">Step 1：選擇車型與方案</h2>
+        <div class="reveal" style="text-align:center;margin:var(--element-gap) 0">
+            <img src="images/official-subscribe-page.png" style="max-height:min(45vh,350px);width:100%;object-fit:contain;border-radius:12px" alt="Swapfiets subscription page">
+        </div>
+        <div class="reveal" style="display:flex;flex-wrap:wrap;justify-content:center;gap:var(--element-gap)">
+            <span style="background:var(--bg-subtle);border:1px solid var(--border);border-radius:8px;padding:0.3em 0.8em;font-size:var(--small-size);font-weight:700">Original <span class="highlight">€16.58</span>/月</span>
+            <span style="background:var(--bg-subtle);border:1px solid var(--border);border-radius:8px;padding:0.3em 0.8em;font-size:var(--small-size);font-weight:700">Deluxe 7 <span class="highlight">€19.91</span>/月</span>
+            <span style="background:var(--bg-subtle);border:1px solid var(--border);border-radius:8px;padding:0.3em 0.8em;font-size:var(--small-size);font-weight:700">Power 1 <span class="highlight">€49.90</span>/月</span>
+            <span style="background:var(--bg-subtle);border:1px solid var(--border);border-radius:8px;padding:0.3em 0.8em;font-size:var(--small-size);font-weight:700">Power 7 <span class="highlight">€64.90</span>/月</span>
+        </div>
+        <p class="reveal small" style="text-align:center;margin-top:var(--element-gap)">學生折扣 ~€2/月 &nbsp;|&nbsp; Loyal 免註冊費綁 6 月 &nbsp;|&nbsp; Flexibel 隨時取消</p>
+    </div>
+</section>
+
+<!-- F3: Online Ordering -->
+<section class="slide">
+    <div class="slide-content" style="justify-content:center">
+        <div class="section-tag blue">Q2 功能面</div>
+        <h2 class="reveal">Step 2-3：線上訂購</h2>
+        <div class="flow reveal" style="margin:var(--content-gap) 0">
+            <span class="flow-step">選擇會員類型</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-step">填寫個人資料</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-step">選取車方式</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-step" style="background:var(--accent-light);border-color:var(--accent)">付款確認</span>
+        </div>
+        <div class="card reveal" style="max-width:40em;margin:0 auto">
+            <h3 style="font-size:var(--small-size);color:var(--accent);margin-bottom:0.3em">首次付款較高</h3>
+            <p style="font-size:var(--small-size);color:var(--text-secondary);line-height:1.6">= 當月比例金額 + 下月預繳月費 + 註冊費（€19.50 / Loyal 免）</p>
+        </div>
+    </div>
+</section>
+
+<!-- F4: Pickup — 15 分鐘搞定 -->
+<section class="slide">
+    <div class="slide-content" style="justify-content:center">
+        <div class="section-tag blue">Q2 功能面</div>
+        <h2 class="reveal">Step 4-7：15 分鐘，搞定一切</h2>
+        <div class="two-col img-left reveal" style="margin-top:var(--element-gap)">
+            <div>
+                <img src="images/swapfiets_store.jpg" style="max-height:min(50vh,400px);border-radius:16px;object-fit:cover;width:100%" alt="Swapfiets store">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:var(--element-gap);justify-content:center">
+                <div class="numbered-item">
+                    <span class="item-num">1</span>
+                    <span style="font-size:var(--body-size)">到店出示 ID（護照或居留證）</span>
+                </div>
+                <div class="numbered-item">
+                    <span class="item-num">2</span>
+                    <span style="font-size:var(--body-size)">身分驗證 + 簽約確認</span>
+                </div>
+                <div class="numbered-item">
+                    <span class="item-num">3</span>
+                    <span style="font-size:var(--body-size)">Swapper 依身高調整車輛</span>
+                </div>
+                <div class="numbered-item">
+                    <span class="item-num">4</span>
+                    <span style="font-size:var(--body-size)">拿鑰匙，開始使用</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- F5: Repair — 車壞了？10 分鐘解決 -->
+<section class="slide">
+    <div class="slide-content" style="justify-content:center">
+        <div class="section-tag blue">Q2 功能面</div>
+        <h2 class="reveal">車壞了？10 分鐘解決</h2>
+        <div class="two-col img-left reveal" style="margin-top:var(--element-gap)">
+            <div>
+                <img src="images/app_flow.jpg" style="max-height:min(50vh,380px);border-radius:20px;box-shadow:0 8px 30px rgba(0,0,0,0.12);width:100%;object-fit:contain" alt="Swapfiets app repair flow">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:var(--element-gap);justify-content:center">
+                <div class="numbered-item">
+                    <span class="item-num">1</span>
+                    <span style="font-size:var(--body-size)">發現故障</span>
+                </div>
+                <div class="numbered-item">
+                    <span class="item-num">2</span>
+                    <span style="font-size:var(--body-size)">打開 App 回報</span>
+                </div>
+                <div class="numbered-item">
+                    <span class="item-num">3</span>
+                    <span style="font-size:var(--body-size)">選擇維修方式</span>
+                </div>
+                <div class="numbered-item">
+                    <span class="item-num">4</span>
+                    <span style="font-size:var(--body-size)">GPS 標示車輛位置</span>
+                </div>
+                <div class="numbered-item">
+                    <span class="item-num">5</span>
+                    <span style="font-size:var(--body-size)">Swapper 到場處理</span>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--element-gap);margin-top:var(--element-gap)">
+                    <div class="card" style="text-align:center;padding:0.6em 0.8em">
+                        <p style="font-size:var(--small-size);font-weight:700;color:var(--success);margin:0">10 分鐘修好</p>
+                        <p style="font-size:var(--small-size);color:var(--text-muted);margin:0">現場修復</p>
+                    </div>
+                    <div class="card" style="text-align:center;padding:0.6em 0.8em">
+                        <p style="font-size:var(--small-size);font-weight:700;color:var(--accent);margin:0">修不好？</p>
+                        <p style="font-size:var(--small-size);color:var(--text-muted);margin:0">直接換一台</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- F6: Return / Theft -->
+<section class="slide">
+    <div class="slide-content" style="justify-content:center">
+        <div class="section-tag blue">Q2 功能面</div>
+        <h2 class="reveal">不騎了？被偷了？</h2>
+        <div class="two-col reveal" style="margin-top:var(--element-gap);align-items:stretch">
+            <!-- 退訂流程 -->
+            <div class="card" style="display:flex;flex-direction:column;gap:var(--element-gap)">
+                <h3 style="font-size:var(--h3-size);color:var(--accent);margin:0">退訂流程</h3>
+                <div class="numbered-item">
+                    <span class="item-num">1</span>
+                    <span style="font-size:var(--small-size)">App 取消（需 1 個月預告期）</span>
+                </div>
+                <div class="numbered-item">
+                    <span class="item-num">2</span>
+                    <span style="font-size:var(--small-size)">預約還車日期</span>
+                </div>
+                <div class="numbered-item">
+                    <span class="item-num">3</span>
+                    <span style="font-size:var(--small-size)">車輛進入翻新流程</span>
+                </div>
+                <div class="numbered-item">
+                    <span class="item-num">4</span>
+                    <span style="font-size:var(--small-size)">分配給下一位會員</span>
+                </div>
+            </div>
+            <!-- 失竊處理 -->
+            <div class="card" style="display:flex;flex-direction:column;gap:var(--element-gap)">
+                <h3 style="font-size:var(--h3-size);color:var(--danger);margin:0">失竊處理</h3>
+                <div class="numbered-item">
+                    <span class="item-num" style="background:var(--danger)">1</span>
+                    <span style="font-size:var(--small-size)">App 報失</span>
+                </div>
+                <div class="numbered-item">
+                    <span class="item-num" style="background:var(--danger)">2</span>
+                    <span style="font-size:var(--small-size)">安排替代車（1-2 天）</span>
+                </div>
+                <div class="numbered-item">
+                    <span class="item-num" style="background:var(--danger)">3</span>
+                    <span style="font-size:var(--small-size)">基本險自付額 €60 / €220</span>
+                </div>
+                <div class="numbered-item">
+                    <span class="item-num" style="background:var(--danger)">4</span>
+                    <span style="font-size:var(--small-size)">全額防盜險 +€3.90-9.90/月</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- S0: Problems Transition -->
+<section class="slide" style="background:#0f1923">
+    <div class="slide-content" style="align-items:center;text-align:center;justify-content:center">
+        <h1 style="color:#ffffff;font-size:var(--title-size)">它解決了哪些問題？</h1>
+        <p style="color:rgba(255,255,255,0.6);font-size:var(--h3-size);margin-top:0.5em">使用者 x 3 &nbsp;+&nbsp; 永續 x 3</p>
+    </div>
+</section>
+
+<!-- S1: 擁有太麻煩 -->
+<section class="slide">
+    <div class="slide-content" style="justify-content:center">
+        <div class="section-tag blue">Q2 功能面</div>
+        <h2 class="reveal" style="margin-bottom:var(--element-gap)">01 ── 擁有太麻煩</h2>
+        <div class="problem-card reveal">
+            <h3 style="font-size:var(--small-size);color:var(--danger);font-weight:700;margin:0 0 0.2em">Problem</h3>
+            <p style="font-size:var(--body-size);color:var(--text);margin:0">買車、修車、防竊的無限循環 -- 擁有一台車的隱性成本遠超車價本身</p>
+        </div>
+        <div class="solution-card reveal">
+            <h3 style="font-size:var(--small-size);color:var(--accent);font-weight:700;margin:0 0 0.2em">Solution</h3>
+            <p style="font-size:var(--body-size);color:var(--text);margin:0">月費訂閱制：壞了換、偷了補、不騎退</p>
+        </div>
+        <div class="benefit-card reveal">
+            <h3 style="font-size:var(--small-size);color:var(--success);font-weight:700;margin:0 0 0.2em">Impact</h3>
+            <p style="font-size:var(--body-size);color:var(--text);margin:0"><strong>54%</strong> 會員之前不騎車 -- Delft 大學研究顯示訂閱制對騎車意願影響最顯著</p>
+        </div>
+    </div>
+</section>
+
+<!-- S2: 支出不可預測 -->
+<section class="slide">
+    <div class="slide-content" style="justify-content:center">
+        <div class="section-tag blue">Q2 功能面</div>
+        <h2 class="reveal" style="margin-bottom:var(--element-gap)">02 ── 支出不可預測</h2>
+        <div class="problem-card reveal">
+            <h3 style="font-size:var(--small-size);color:var(--danger);font-weight:700;margin:0 0 0.2em">Problem</h3>
+            <p style="font-size:var(--body-size);color:var(--text);margin:0">車價 + 鎖 + 燈 + 修車 + 被偷 = 不可預測的大額支出</p>
+        </div>
+        <div class="solution-card reveal">
+            <h3 style="font-size:var(--small-size);color:var(--accent);font-weight:700;margin:0 0 0.2em">Solution</h3>
+            <p style="font-size:var(--body-size);color:var(--text);margin:0">固定月費 €12-16.90，維修、保險、配件全部包含</p>
+        </div>
+        <div class="benefit-card reveal">
+            <h3 style="font-size:var(--small-size);color:var(--success);font-weight:700;margin:0 0 0.2em">Impact</h3>
+            <p style="font-size:var(--body-size);color:var(--text);margin:0">平均使用 <strong>2 年</strong>，年收入 <strong>€341</strong> 持續成長，商業可行性已驗證</p>
+        </div>
+    </div>
+</section>
+
+<!-- S3: 車常被偷 -->
+<section class="slide">
+    <div class="slide-content" style="justify-content:center">
+        <div class="section-tag blue">Q2 功能面</div>
+        <h2 class="reveal" style="margin-bottom:var(--element-gap)">03 ── 車常被偷</h2>
+        <div class="problem-card reveal">
+            <h3 style="font-size:var(--small-size);color:var(--danger);font-weight:700;margin:0 0 0.2em">Problem</h3>
+            <p style="font-size:var(--body-size);color:var(--text);margin:0">荷蘭每年 93 萬輛被偷，好車更容易成為目標</p>
+        </div>
+        <div class="solution-card reveal">
+            <h3 style="font-size:var(--small-size);color:var(--accent);font-weight:700;margin:0 0 0.2em">Solution</h3>
+            <p style="font-size:var(--body-size);color:var(--text);margin:0">藍色前輪社會性防竊 + 雙鎖系統 + 內建防竊保險</p>
+        </div>
+        <div class="benefit-card reveal">
+            <h3 style="font-size:var(--small-size);color:var(--success);font-weight:700;margin:0 0 0.2em">Impact</h3>
+            <p style="font-size:var(--body-size);color:var(--text);margin:0">Delft 研究證實防竊效果 + 倫敦用戶心聲：「藍色輪胎讓我安心」</p>
+        </div>
+    </div>
+</section>
+
+<!-- S4: 線性經濟 -->
+<section class="slide">
+    <div class="slide-content" style="justify-content:center">
+        <div class="section-tag green">Q2 功能面</div>
+        <h2 class="reveal" style="margin-bottom:var(--element-gap)">04 ── 線性經濟</h2>
+        <div class="problem-card reveal">
+            <h3 style="font-size:var(--small-size);color:var(--danger);font-weight:700;margin:0 0 0.2em">Problem</h3>
+            <p style="font-size:var(--body-size);color:var(--text);margin:0">全球每年 1500 萬輛自行車進垃圾場，Take-Make-Waste 的線性模型</p>
+        </div>
+        <div class="solution-card reveal">
+            <h3 style="font-size:var(--small-size);color:var(--accent);font-weight:700;margin:0 0 0.2em">Solution</h3>
+            <p style="font-size:var(--body-size);color:var(--text);margin:0">所有權保留 → TCO 思維 → 迭代改進 → 翻新再分配</p>
+        </div>
+        <div class="benefit-card reveal">
+            <h3 style="font-size:var(--small-size);color:var(--success);font-weight:700;margin:0 0 0.2em">Impact</h3>
+            <p style="font-size:var(--body-size);color:var(--text);margin:0">Deluxe 7 達 <strong>88% 循環度</strong>，環境衝擊比傳統低 <strong>35%</strong></p>
+        </div>
+    </div>
+</section>
+
+<!-- S5: 共享單車泡沫 -->
+<section class="slide">
+    <div class="slide-content" style="justify-content:center">
+        <div class="section-tag green">Q2 功能面</div>
+        <h2 class="reveal" style="margin-bottom:var(--element-gap)">05 ── 共享單車泡沫</h2>
+        <div class="problem-card reveal">
+            <h3 style="font-size:var(--small-size);color:var(--danger);font-weight:700;margin:0 0 0.2em">Problem</h3>
+            <p style="font-size:var(--body-size);color:var(--text);margin:0">Ofo 燒 $22 億破產、Velib' 80% 車被毀 -- 共享模式的破壞循環</p>
+        </div>
+        <div class="solution-card reveal">
+            <h3 style="font-size:var(--small-size);color:var(--accent);font-weight:700;margin:0 0 0.2em">Solution</h3>
+            <p style="font-size:var(--body-size);color:var(--text);margin:0">每台車綁定一位會員 + 企業控制完整生命週期</p>
+        </div>
+        <div class="benefit-card reveal">
+            <h3 style="font-size:var(--small-size);color:var(--success);font-weight:700;margin:0 0 0.2em">Impact</h3>
+            <p style="font-size:var(--body-size);color:var(--text);margin:0">營運十年無單車墳場，<strong>2024 年達正向現金流</strong></p>
+        </div>
+    </div>
+</section>
+
+<!-- S6: 隱藏碳排 -->
+<section class="slide">
+    <div class="slide-content" style="justify-content:center">
+        <div class="section-tag green">Q2 功能面</div>
+        <h2 class="reveal" style="margin-bottom:var(--element-gap)">06 ── 隱藏碳排</h2>
+        <div class="problem-card reveal">
+            <h3 style="font-size:var(--small-size);color:var(--danger);font-weight:700;margin:0 0 0.2em">Problem</h3>
+            <p style="font-size:var(--body-size);color:var(--text);margin:0">原生鋁 18kg CO2/kg、44,000 噸橡膠廢棄 -- 自行車的隱藏碳足跡</p>
+        </div>
+        <div class="solution-card reveal">
+            <h3 style="font-size:var(--small-size);color:var(--accent);font-weight:700;margin:0 0 0.2em">Solution</h3>
+            <p style="font-size:var(--body-size);color:var(--text);margin:0">Hydro 回收鋁 + HKS 閉環回收 + Vittoria 輪胎訂閱</p>
+        </div>
+        <div class="benefit-card reveal">
+            <h3 style="font-size:var(--small-size);color:var(--success);font-weight:700;margin:0 0 0.2em">Impact</h3>
+            <p style="font-size:var(--body-size);color:var(--text);margin:0">2021 減少 <strong>80 萬 kg CO2</strong>，零橡膠廢棄物，年創 <strong>350 萬歐</strong>社會效益</p>
+        </div>
+    </div>
+</section>
+<!-- ============================================================ -->
+<!--  Q2 — 符號面  (6 slides, frontend-slides format)            -->
+<!-- ============================================================ -->
+
+<!-- Sym0: Section Divider -->
+<section class="slide" style="background:#0f1923;">
+    <div class="slide-content" style="align-items:center;text-align:center;justify-content:center;">
+        <p class="reveal" style="font-family:var(--font-display);font-size:var(--small-size);font-weight:700;color:var(--accent);letter-spacing:0.1em;text-transform:uppercase;">Section 2</p>
+        <h1 class="reveal" style="color:#ffffff;font-size:var(--title-size);margin-top:0.25em;">Q2 — 符號面</h1>
+        <p class="reveal" style="color:rgba(255,255,255,0.6);font-size:var(--body-size);max-width:36em;margin-top:0.5em;line-height:1.7;">使用者怎麼知道該怎麼用？什麼符號在引導操作？</p>
+    </div>
+</section>
+
+<!-- Sym1: Delft Blue -->
+<section class="slide">
+    <div class="slide-content">
+        <div class="section-tag"><span style="background:var(--accent)"></span>Q2 符號面</div>
+        <h2 class="reveal" style="margin-top:0.5em;">「Delft Blue」— 最具代表性的藍色輪胎</h2>
+        <div class="two-col img-left reveal" style="flex:1;min-height:0;">
+            <div style="display:flex;align-items:center;justify-content:center;">
+                <img src="images/symbol-delft-blue.jpg" style="max-height:min(50vh,400px);width:100%;object-fit:contain;border-radius:16px" alt="Delft Blue 藍色前輪">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:var(--element-gap);justify-content:center;">
+                <div style="background:var(--bg-subtle);border-radius:clamp(8px,1vw,12px);padding:clamp(0.6rem,1.5vw,1rem);border:1px solid var(--border);">
+                    <h3 style="font-size:var(--small-size);margin-bottom:0.2em;">品牌識別「藍色前輪」</h3>
+                    <p style="font-size:var(--small-size);color:var(--text-secondary);line-height:1.6;">刻意選用「代爾夫特藍」向荷蘭青花瓷致敬。官方註冊為「位置商標」，在荷比盧保護此設計元素。</p>
+                </div>
+                <div style="background:var(--bg-subtle);border-radius:clamp(8px,1vw,12px);padding:clamp(0.6rem,1.5vw,1rem);border:1px solid var(--border);">
+                    <h3 style="font-size:var(--small-size);margin-bottom:0.2em;">社會性防竊</h3>
+                    <p style="font-size:var(--small-size);color:var(--text-secondary);line-height:1.6;">整座城市都知道藍色前輪＝Swapfiets，車輛難以隱藏或轉手。</p>
+                </div>
+                <div style="background:var(--bg-subtle);border-radius:clamp(8px,1vw,12px);padding:clamp(0.6rem,1.5vw,1rem);border:1px solid var(--border);">
+                    <h3 style="font-size:var(--small-size);margin-bottom:0.2em;">社群辨識</h3>
+                    <p style="font-size:var(--small-size);color:var(--text-secondary);line-height:1.6;">「You're part of our family」，把使用者、車、城市包裝成一種生活方式。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Sym2: Dutch bike culture -->
+<section class="slide">
+    <div class="slide-content">
+        <div class="section-tag"><span style="background:var(--accent)"></span>Q2 符號面</div>
+        <h2 class="reveal" style="margin-top:0.5em;">荷蘭式城市自行車的文化符號</h2>
+        <div class="two-col img-left reveal" style="flex:1;min-height:0;">
+            <div style="display:flex;align-items:center;justify-content:center;">
+                <img src="images/symbol-omafiets.png" style="max-height:min(50vh,400px);width:100%;object-fit:contain" alt="Omafiets 荷蘭城市車">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:var(--element-gap);justify-content:center;">
+                <div style="background:var(--bg-subtle);border-radius:clamp(8px,1vw,12px);padding:clamp(0.75rem,2vw,1.25rem);border:1px solid var(--border);">
+                    <h3 style="font-size:var(--small-size);margin-bottom:0.25em;">Omafiets 城市車文化</h3>
+                    <p style="font-size:var(--small-size);color:var(--text-secondary);line-height:1.6;">直立騎姿、厚胎、低速通勤。腳煞車（coaster brake）符合荷蘭騎乘習慣。</p>
+                    <p style="font-size:var(--small-size);color:var(--accent);font-weight:500;margin-top:0.3em;line-height:1.6;">→ 引導使用者將騎車理解為日常移動，而非運動或性能追求。</p>
+                </div>
+                <div style="background:var(--bg-subtle);border-radius:clamp(8px,1vw,12px);padding:clamp(0.75rem,2vw,1.25rem);border:1px solid var(--border);">
+                    <h3 style="font-size:var(--small-size);margin-bottom:0.25em;">雙鎖設計</h3>
+                    <p style="font-size:var(--small-size);color:var(--text-secondary);line-height:1.6;">車架鎖環（ring lock）鎖住後輪。隨車鎖鏈把車鎖在固定物上。Swapfiets 透過使用規範＋寬減賠償鼓勵上鎖。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Sym3: Ownership feeling -->
+<section class="slide">
+    <div class="slide-content">
+        <div class="section-tag"><span style="background:var(--accent)"></span>Q2 符號面</div>
+        <h2 class="reveal" style="margin-top:0.5em;">創造「擁有感」的長租制與獨立鑰匙鎖</h2>
+        <div class="two-col img-left reveal" style="flex:1;min-height:0;">
+            <div style="display:flex;align-items:center;justify-content:center;">
+                <img src="images/symbol-key-lock.jpg" style="max-height:min(50vh,400px);width:100%;object-fit:cover;border-radius:16px" alt="鑰匙與鎖">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:var(--element-gap);justify-content:center;">
+                <div style="background:var(--bg-subtle);border-radius:clamp(8px,1vw,12px);padding:clamp(0.75rem,2vw,1.25rem);border:1px solid var(--border);">
+                    <h3 style="font-size:var(--small-size);margin-bottom:0.25em;">長租制</h3>
+                    <p style="font-size:var(--small-size);color:var(--text-secondary);line-height:1.6;">每位使用者被分配一輛固定的車，不是隨機解鎖。接近「擁有自己的車」的使用情境。</p>
+                </div>
+                <div style="background:var(--bg-subtle);border-radius:clamp(8px,1vw,12px);padding:clamp(0.75rem,2vw,1.25rem);border:1px solid var(--border);">
+                    <h3 style="font-size:var(--small-size);margin-bottom:0.25em;">獨立鑰匙 ＝ 擁有的符號</h3>
+                    <p style="font-size:var(--small-size);color:var(--text-secondary);line-height:1.6;">兩把實體鑰匙＋兩組鎖。取車時親手拿到鑰匙→「門在我手上」的儀式。強化「這是我個人的車」的認知。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Sym4: Integration -->
+<section class="slide">
+    <div class="slide-content">
+        <div class="section-tag"><span style="background:var(--accent)"></span>Q2 符號面</div>
+        <h2 class="reveal" style="margin-top:0.5em;">符號面整合洞察</h2>
+        <div class="card-grid cols-2 reveal" style="margin-top:var(--content-gap);">
+            <div class="card" style="border-top:3px solid var(--accent);">
+                <h3 style="font-size:var(--small-size);color:var(--accent);margin-bottom:0.4em;">車體設計</h3>
+                <p style="font-size:var(--body-size);color:var(--text-secondary);line-height:1.7;">引導「如何使用這台車」— 日常化、低負擔，同時保有責任感</p>
+            </div>
+            <div class="card" style="border-top:3px solid var(--mint);">
+                <h3 style="font-size:var(--small-size);color:var(--success);margin-bottom:0.4em;">App 流程設計</h3>
+                <p style="font-size:var(--body-size);color:var(--text-secondary);line-height:1.7;">引導「遇到問題時怎麼做」— 依賴系統，放棄技術介入</p>
+            </div>
+        </div>
+        <div class="quote-block reveal" style="margin-top:var(--content-gap);">
+            <p style="font-size:var(--body-size);color:var(--text-secondary);font-style:italic;line-height:1.7;">一方面讓使用者「像擁有一樣使用」，另一方面引導其「依賴系統」，形成一種既負責任又不真正擁有的使用行為。</p>
+        </div>
+    </div>
+</section>
+
+<!-- Sym5: Transition -->
+<section class="slide">
+    <div class="slide-content" style="align-items:center;text-align:center;justify-content:center;">
+        <p class="reveal" style="font-size:var(--h2-size);font-weight:700;color:var(--text);line-height:1.4;">符號告訴你「怎麼用」，接下來看——</p>
+        <p class="reveal" style="font-size:var(--body-size);color:var(--text-muted);max-width:28em;margin-top:0.5em;line-height:1.7;">背後需要什麼勞動、設備和規則來支撐？</p>
+    </div>
+</section>
+<!-- ==================== Q2 技術面 (Tech0–Tech6, 8 slides) ==================== -->
+
+<!-- Tech0: Section Divider -->
+<section class="slide" style="background:#0f1923">
+  <div class="slide-content" style="align-items:center;text-align:center;justify-content:center">
+    <p style="font-family:var(--font-display);font-size:var(--small-size);font-weight:700;color:var(--accent);letter-spacing:0.05em">Q2 — 技術面</p>
+    <h1 style="color:#fff;margin-top:0.3em">它如何運作？<br>需要哪些支撐？</h1>
+  </div>
+</section>
+
+<!-- Tech1: PaaS -->
+<section class="slide">
+  <div class="slide-content">
+    <div class="section-tag blue">Q2 技術面</div>
+    <h2>核心機制：產品即服務 (PaaS)</h2>
+
+    <div class="flow" style="margin:var(--content-gap) 0">
+      <div class="flow-step" style="background:var(--accent);color:#fff">使用者月付 €15.90 起</div>
+      <span class="flow-arrow">⇆</span>
+      <div class="flow-step" style="background:var(--accent);color:#fff">Swapfiets 保有所有權</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step" style="background:var(--mint);color:var(--text)">壞了修/換，退了翻新</div>
+    </div>
+
+    <div class="card-grid cols-3" style="margin-top:var(--element-gap)">
+      <div class="card" style="border-left:3px solid var(--accent)">
+        <h3 style="font-size:var(--small-size);margin-bottom:0.3em">訂閱本質</h3>
+        <p style="font-size:var(--small-size)">將產品擁有權轉化為訂閱服務。使用者不買車，只付月費換取「隨時有車可騎」的權利。</p>
+      </div>
+      <div class="card" style="border-left:3px solid var(--gold)">
+        <h3 style="font-size:var(--small-size);margin-bottom:0.3em">首次付款</h3>
+        <p style="font-size:var(--small-size)">含當月比例 + 下月預繳 + 註冊費（Flexibel 方案 €19.50）。首期金額較高但之後穩定。</p>
+      </div>
+      <div class="card" style="border-left:3px solid var(--success)">
+        <h3 style="font-size:var(--small-size);margin-bottom:0.3em">維修承諾</h3>
+        <p style="font-size:var(--small-size)">故障透過 App 預約，10 分鐘修不好直接換車。所有磨損維修包含在月費內。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Tech2: Labor -->
+<section class="slide">
+  <div class="slide-content">
+    <div class="section-tag blue">Q2 技術面</div>
+    <h2>需要哪些勞動？</h2>
+
+    <div class="card-grid cols-3" style="flex:1;align-content:center">
+      <div class="card" style="border-left:3px solid var(--accent)">
+        <h3 style="font-size:var(--h3-size);margin-bottom:0.4em">01 — 前線維修與物流技師</h3>
+        <p style="font-size:var(--small-size)">店內快速維修或到府換車。每位 Swapper 都經過訓練，能在 10 分鐘內診斷並決定修復或替換。</p>
+      </div>
+      <div class="card" style="border-left:3px solid var(--success)">
+        <h3 style="font-size:var(--h3-size);margin-bottom:0.4em">02 — 後端整備與翻新勞動</h3>
+        <p style="font-size:var(--small-size)">退租車全面檢查維修翻新。車輛進入倉庫後經過標準化流程，確保每台再出租的車都符合品質標準。</p>
+      </div>
+      <div class="card" style="border-left:3px solid var(--gold)">
+        <h3 style="font-size:var(--h3-size);margin-bottom:0.4em">03 — 客服與尋車人員</h3>
+        <p style="font-size:var(--small-size)">處理取消、帳單爭議，違停被拖吊時取回車輛。確保每台車都在系統掌控之中。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Tech3: Equipment — bike (Original) -->
+<section class="slide">
+  <div class="slide-content">
+    <div class="section-tag blue">Q2 技術面</div>
+    <h2>需要哪些設備？ — 以 Original 為例</h2>
+
+    <div class="two-col img-left" style="flex:1;align-items:center">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:var(--element-gap)">
+        <img src="assets/official-site/images/bike-config-view.png" style="max-height:min(50vh,400px);width:100%;object-fit:contain;border-radius:clamp(8px,1vw,12px)">
+        <a href="https://swapfiets.nl/nl-NL/delft/original" target="_blank" style="color:var(--accent);font-weight:700;font-size:var(--small-size);text-decoration:none">swapfiets.nl/original →</a>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:var(--element-gap)">
+        <div class="numbered-item">
+          <div class="item-num">1</div>
+          <p style="font-size:var(--small-size);margin:0">標誌性藍色前輪</p>
+        </div>
+        <div class="numbered-item">
+          <div class="item-num">2</div>
+          <p style="font-size:var(--small-size);margin:0">可選置物籃</p>
+        </div>
+        <div class="numbered-item">
+          <div class="item-num">3</div>
+          <p style="font-size:var(--small-size);margin:0">雙鎖保障安全</p>
+        </div>
+        <div class="numbered-item">
+          <div class="item-num">4</div>
+          <p style="font-size:var(--small-size);margin:0">無需電池 LED 燈</p>
+        </div>
+        <div class="numbered-item">
+          <div class="item-num">5</div>
+          <p style="font-size:var(--small-size);margin:0">鞍座車把可調節</p>
+        </div>
+        <div class="numbered-item">
+          <div class="item-num">6</div>
+          <p style="font-size:var(--small-size);margin:0">低跨點無齒輪設計</p>
+        </div>
+        <p class="small" style="margin-top:0.5em">其他車型：Deluxe 7、Power 1/7</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Tech3b: Digital -->
+<section class="slide">
+  <div class="slide-content">
+    <div class="section-tag blue">Q2 技術面</div>
+    <h2>數位管理媒介</h2>
+
+    <div class="card-grid cols-3" style="flex:1;align-content:center">
+      <div class="card" style="border-left:3px solid var(--accent)">
+        <h3 style="font-size:var(--h3-size);margin-bottom:0.4em">01 — App</h3>
+        <p style="font-size:var(--small-size)">預約維修、尋找門市、查看發票、取消訂閱。使用者端所有操作的單一入口。</p>
+      </div>
+      <div class="card" style="border-left:3px solid var(--success)">
+        <h3 style="font-size:var(--h3-size);margin-bottom:0.4em">02 — 官方網站</h3>
+        <p style="font-size:var(--small-size)">車款比較、費用試算、規則說明。新客戶的主要獲取渠道與資訊平台。</p>
+      </div>
+      <div class="card" style="border-left:3px solid var(--gold)">
+        <h3 style="font-size:var(--h3-size);margin-bottom:0.4em">03 — 後方數據庫</h3>
+        <p style="font-size:var(--small-size)">Cookie 與追蹤器（GA、Meta、TikTok 像素、HubSpot）。用於行為分析、再行銷與客戶關係管理。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Tech4: Rules -->
+<section class="slide">
+  <div class="slide-content">
+    <div class="section-tag blue">Q2 技術面</div>
+    <h2>需要哪些規則？</h2>
+
+    <div class="card-grid cols-3" style="flex:1;align-content:center">
+      <div class="card" style="border-left:3px solid var(--accent)">
+        <h3 style="font-size:var(--h3-size);margin-bottom:0.4em">01 — 取消與退租</h3>
+        <p style="font-size:var(--small-size)">彈性方案：1 個月預告期</p>
+        <p style="font-size:var(--small-size)">Loyal 方案：綁約 6/12 個月</p>
+        <p style="font-size:var(--small-size)">14 天寬限期非免費試用</p>
+      </div>
+      <div class="card" style="border-left:3px solid var(--danger)">
+        <h3 style="font-size:var(--h3-size);margin-bottom:0.4em">02 — 防盜規範</h3>
+        <p style="font-size:var(--small-size)">隨時雙重上鎖</p>
+        <p style="font-size:var(--small-size)">遺失須出示鑰匙</p>
+        <p style="font-size:var(--small-size)">可加購防盜險（€3.90-9.90/月）</p>
+      </div>
+      <div class="card" style="border-left:3px solid var(--gold)">
+        <h3 style="font-size:var(--h3-size);margin-bottom:0.4em">03 — 懲罰性附加費用</h3>
+        <p style="font-size:var(--small-size);font-weight:700">爽約 €20</p>
+        <p style="font-size:var(--small-size);font-weight:700">遺失鑰匙 €25–40</p>
+        <p style="font-size:var(--small-size);font-weight:700">違停拖吊 €40–60</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Tech5: Maintenance -->
+<section class="slide">
+  <div class="slide-content">
+    <div class="section-tag blue">Q2 技術面</div>
+    <h2>維護：不只維護車輛，更維護材料循環</h2>
+
+    <div class="two-col" style="flex:1;align-items:stretch">
+      <div class="card" style="border-left:3px solid var(--accent);display:flex;flex-direction:column;gap:var(--element-gap)">
+        <h3 style="font-size:var(--h3-size)">日常維護</h3>
+        <p style="font-size:var(--small-size)">磨損包含在訂閱費中，使用者無需額外支付。</p>
+        <p style="font-size:var(--small-size)">Swapper 現場 10 分鐘快修；修不好直接換一台同等級的車。</p>
+        <p style="font-size:var(--small-size)">目標：讓使用者永遠不會因為車的問題中斷日常。</p>
+      </div>
+      <div class="card" style="border-left:3px solid var(--success);display:flex;flex-direction:column;gap:var(--element-gap)">
+        <h3 style="font-size:var(--h3-size)">產品生命週期維護</h3>
+        <p style="font-size:var(--small-size)">故障 → 修復 → 重新利用 → 回收。每台車在系統中持續循環。</p>
+        <p style="font-size:var(--small-size)">維修數據回饋設計團隊，每一代車型都根據實際故障模式迭代改進。</p>
+        <p style="font-size:var(--small-size)">Deluxe 7 達 88% 循環度，環境衝擊比傳統車低約 35%。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Tech6: Transition -->
+<section class="slide">
+  <div class="slide-content" style="align-items:center;text-align:center;justify-content:center">
+    <div class="section-tag blue">Q2 技術面</div>
+    <h2 style="font-size:var(--h2-size)">Swapfiets 的設計看起來很完美——</h2>
+    <p style="font-size:var(--body-size);color:var(--text-secondary);margin-top:0.5em">但這個解方會不會造成其他問題？</p>
+  </div>
+</section>
+<!-- ============================================================ -->
+<!--  Q3 — 解方的問題  (9 slides + Thank You, frontend-slides)    -->
+<!-- ============================================================ -->
+
+<!-- Q3-0: Section Divider -->
+<section class="slide" style="background:#121212;">
+    <div class="slide-content" style="align-items:center;text-align:center;justify-content:center;">
+        <p class="reveal" style="font-family:var(--font-display);font-size:var(--small-size);font-weight:700;color:#E65100;letter-spacing:0.1em;text-transform:uppercase;">Q3</p>
+        <h1 class="reveal" style="color:#ffffff;font-size:var(--title-size);margin-top:0.25em;max-width:16em;">這個設計解方會不會<br>造成其他問題？</h1>
+    </div>
+</section>
+
+<!-- Q3-1: 竊盜風險 -->
+<section class="slide">
+    <div class="slide-content">
+        <div class="section-tag" style="color:#E65100"><span style="background:#E65100"></span>Q3 解方的問題</div>
+        <h2 class="reveal" style="margin-top:0.5em;">① 偷竊風險仍未完全消除</h2>
+        <div class="card-grid cols-2 reveal" style="margin-top:var(--content-gap);">
+            <div class="card" style="border-top:3px solid var(--accent);">
+                <h3 style="font-size:var(--h3-size);color:var(--accent);margin-bottom:0.4em;">防竊 ✓</h3>
+                <p style="font-size:var(--body-size);color:var(--text-secondary);line-height:1.7;">藍色前輪辨識度極高，全城皆知。偷了太容易被認出，形成社會性嚇阻。</p>
+            </div>
+            <div class="card" style="border-top:3px solid var(--danger);">
+                <h3 style="font-size:var(--h3-size);color:var(--danger);margin-bottom:0.4em;">引竊 ✗</h3>
+                <p style="font-size:var(--body-size);color:var(--text-secondary);line-height:1.7;">竊賊更容易鎖定高價目標。Premium 防竊險費用最終轉嫁給使用者。</p>
+            </div>
+        </div>
+        <div class="quote-block reveal" style="margin-top:var(--content-gap);border-left-color:#E65100;background:#FFF3E0;">
+            <p style="font-size:var(--body-size);color:var(--text-secondary);font-style:italic;line-height:1.7;">藍色前輪在「防竊」和「引竊」之間的張力，是一個設計矛盾。</p>
+        </div>
+    </div>
+</section>
+
+<!-- Q3-2: 道德風險 -->
+<section class="slide">
+    <div class="slide-content">
+        <div class="section-tag" style="color:#E65100"><span style="background:#E65100"></span>Q3 解方的問題</div>
+        <h2 class="reveal" style="margin-top:0.5em;">② 道德風險：訂閱制削弱珍惜動機</h2>
+        <div class="two-col reveal" style="margin-top:var(--content-gap);flex:1;min-height:0;">
+            <div style="display:flex;flex-direction:column;gap:var(--element-gap);justify-content:center;">
+                <div class="card" style="border-left:4px solid var(--accent);border-top:none;">
+                    <h3 style="font-size:var(--h3-size);color:var(--accent);margin-bottom:0.3em;">Swapfiets 無感永續</h3>
+                    <p style="font-size:var(--body-size);color:var(--text-secondary);line-height:1.7;">壞了就換 → 不用珍惜？</p>
+                    <p style="font-size:var(--body-size);color:var(--text-secondary);line-height:1.7;">降低使用者主動維護的動機</p>
+                </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:var(--element-gap);justify-content:center;">
+                <div class="card" style="border-left:4px solid var(--success);border-top:none;">
+                    <h3 style="font-size:var(--h3-size);color:var(--success);margin-bottom:0.3em;">Bike Kitchen 具身永續</h3>
+                    <p style="font-size:var(--body-size);color:var(--text-secondary);line-height:1.7;">你親手修車 → 更珍惜</p>
+                    <p style="font-size:var(--body-size);color:var(--text-secondary);line-height:1.7;">透過身體參與建立物質連結</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Q3-3: 物流風險 -->
+<section class="slide">
+    <div class="slide-content">
+        <div class="section-tag" style="color:#E65100"><span style="background:#E65100"></span>Q3 解方的問題</div>
+        <h2 class="reveal" style="margin-top:0.5em;">③ 物流風險：承諾與現實的落差</h2>
+        <div class="reveal" style="text-align:center;margin-top:var(--content-gap);">
+            <p style="font-family:var(--font-display);font-size:var(--h2-size);font-weight:900;color:var(--text);line-height:1.2;">「10 分鐘修不好就換車」</p>
+        </div>
+        <div class="card-grid cols-2 reveal" style="margin-top:var(--content-gap);">
+            <div class="card" style="border-top:3px solid var(--danger);">
+                <h3 style="font-size:var(--h3-size);color:var(--danger);margin-bottom:0.4em;">挑戰</h3>
+                <p style="font-size:var(--body-size);color:var(--text-secondary);line-height:1.7;">維修高峰期備車不足</p>
+                <p style="font-size:var(--body-size);color:var(--text-secondary);line-height:1.7;">Trustpilot 負評集中在等待時間</p>
+            </div>
+            <div class="card" style="border-top:3px solid #E65100;">
+                <h3 style="font-size:var(--h3-size);color:#E65100;margin-bottom:0.4em;">結構性張力</h3>
+                <p style="font-size:var(--body-size);color:var(--text-secondary);line-height:1.7;">規模越大，物流車隊碳足跡越高</p>
+                <p style="font-size:var(--body-size);color:var(--text-secondary);line-height:1.7;">便利性承諾與永續目標的衝突</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Q3-4: 契約外行為 + 經濟排除性 -->
+<section class="slide">
+    <div class="slide-content">
+        <div class="section-tag" style="color:#E65100"><span style="background:#E65100"></span>Q3 解方的問題</div>
+        <h2 class="reveal" style="margin-top:0.5em;">④⑤ 契約外行為 & 經濟排除性</h2>
+        <div class="two-col reveal" style="margin-top:var(--content-gap);flex:1;min-height:0;">
+            <div style="display:flex;flex-direction:column;gap:var(--element-gap);justify-content:center;">
+                <div class="card" style="border-left:4px solid var(--danger);border-top:none;">
+                    <h3 style="font-size:var(--h3-size);color:var(--danger);margin-bottom:0.3em;">契約外行為</h3>
+                    <p style="font-size:var(--body-size);color:var(--text-secondary);line-height:1.7;">日常磨損 vs 過度損壞，界線模糊</p>
+                    <p style="font-size:var(--body-size);color:var(--text-secondary);line-height:1.7;">使用者自行修車可能違反契約</p>
+                    <p style="font-size:var(--small-size);color:var(--text-muted);line-height:1.6;margin-top:0.5em;">→ 使用者被迫依賴系統，失去自主維修權</p>
+                </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:var(--element-gap);justify-content:center;">
+                <div class="card" style="border-left:4px solid #E65100;border-top:none;">
+                    <h3 style="font-size:var(--h3-size);color:#E65100;margin-bottom:0.3em;">經濟排除性</h3>
+                    <p style="font-size:var(--body-size);color:var(--text-secondary);line-height:1.7;"><strong style="font-size:1.1em;">€203/年</strong> vs 二手車 <strong style="font-size:1.1em;">€50</strong></p>
+                    <p style="font-size:var(--body-size);color:var(--text-secondary);line-height:1.7;">循環經濟成為中產階級的消費選擇</p>
+                    <p style="font-size:var(--small-size);color:var(--text-muted);line-height:1.6;margin-top:0.5em;">→ 永續不該只是付得起的人的特權</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Q3-5: 根本辯論 -->
+<section class="slide">
+    <div class="slide-content">
+        <div class="section-tag" style="color:#E65100"><span style="background:#E65100"></span>Q3 解方的問題</div>
+        <h2 class="reveal" style="margin-top:0.5em;">⑥ 無感永續 vs 具身永續</h2>
+        <div class="quote-block reveal" style="margin-top:var(--content-gap);border-left-color:#E65100;background:#FFF3E0;">
+            <p style="font-size:var(--body-size);color:var(--text-secondary);font-style:italic;line-height:1.7;">Swapfiets 讓永續變得「無感」——不需改變習慣，企業在背後處理所有循環。</p>
+        </div>
+        <div class="card-grid cols-2 reveal" style="margin-top:var(--content-gap);">
+            <div class="card" style="border-top:3px solid var(--accent);">
+                <h3 style="font-size:var(--h3-size);color:var(--accent);margin-bottom:0.4em;">政治選擇</h3>
+                <p style="font-size:var(--body-size);color:var(--text-secondary);line-height:1.7;">不挑戰消費者 → 快速規模化</p>
+                <p style="font-size:var(--body-size);color:var(--text-secondary);line-height:1.7;">降低參與門檻，讓永續「方便」</p>
+            </div>
+            <div class="card" style="border-top:3px solid var(--danger);">
+                <h3 style="font-size:var(--h3-size);color:var(--danger);margin-bottom:0.4em;">代價</h3>
+                <p style="font-size:var(--body-size);color:var(--text-secondary);line-height:1.7;">沒有在改變消費文化本身</p>
+                <p style="font-size:var(--body-size);color:var(--text-secondary);line-height:1.7;">88% 循環度——是對抗系統，還是漂綠？</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Q3-6: 三層分析邏輯 -->
+<section class="slide">
+    <div class="slide-content">
+        <div class="section-tag" style="color:#E65100"><span style="background:#E65100"></span>Q3 解方的問題</div>
+        <h2 class="reveal" style="margin-top:0.5em;">三層分析的內在邏輯</h2>
+        <div class="flow reveal" style="margin-top:var(--content-gap);gap:clamp(0.5rem,1.5vw,1rem);">
+            <div class="flow-step" style="background:var(--accent-light);border-color:var(--accent);color:var(--accent);padding:clamp(0.5em,1.5vw,1em) clamp(0.75em,2vw,1.5em);">
+                <div style="font-size:var(--body-size);font-weight:700;">功能面</div>
+                <div style="font-size:var(--small-size);font-weight:400;color:var(--text-secondary);margin-top:0.2em;">決定所有權結構</div>
+            </div>
+            <div class="flow-arrow" style="font-size:clamp(1.2em,2.5vw,2em);">→</div>
+            <div class="flow-step" style="background:var(--mint-light);border-color:var(--success);color:var(--success);padding:clamp(0.5em,1.5vw,1em) clamp(0.75em,2vw,1.5em);">
+                <div style="font-size:var(--body-size);font-weight:700;">技術面</div>
+                <div style="font-size:var(--small-size);font-weight:400;color:var(--text-secondary);margin-top:0.2em;">循環設計成為可能</div>
+            </div>
+            <div class="flow-arrow" style="font-size:clamp(1.2em,2.5vw,2em);">→</div>
+            <div class="flow-step" style="background:#FFF3E0;border-color:#E65100;color:#E65100;padding:clamp(0.5em,1.5vw,1em) clamp(0.75em,2vw,1.5em);">
+                <div style="font-size:var(--body-size);font-weight:700;">符號面</div>
+                <div style="font-size:var(--small-size);font-weight:400;color:var(--text-secondary);margin-top:0.2em;">解決「不擁有但要珍惜」</div>
+            </div>
+        </div>
+        <div class="quote-block reveal" style="margin-top:var(--content-gap);border-left-color:#E65100;background:#FFF3E0;">
+            <p style="font-size:var(--body-size);color:var(--text-secondary);font-style:italic;line-height:1.7;">每一個設計解方，同時也是一個新的設計問題。</p>
+        </div>
+    </div>
+</section>
+
+<!-- Q3-7: 最終反思 -->
+<section class="slide">
+    <div class="slide-content" style="align-items:center;text-align:center;justify-content:center;">
+        <div class="section-tag" style="color:#E65100"><span style="background:#E65100"></span>Q3 解方的問題</div>
+        <h2 class="reveal" style="max-width:18em;line-height:1.3;font-size:var(--h2-size);">循環經濟是在對抗<br>Take-Make-Waste 系統，<br>還是在幫這個系統漂綠？</h2>
+        <p class="reveal" style="max-width:32em;margin-top:var(--content-gap);font-size:var(--body-size);color:var(--text-secondary);line-height:1.8;">Swapfiets 證明了讓產品活更久可以同時是好生意和好設計。但當永續變得太「方便」，我們是否正在失去對物質世界的真實感受？</p>
+    </div>
+</section>
+
+<!-- Thank You -->
+<section class="slide" style="background:#F5C842;">
+    <div class="slide-content" style="align-items:center;text-align:center;justify-content:center;">
+        <h1 class="reveal" style="color:#1a1a1a;font-size:clamp(3rem,10vw,7rem);line-height:1.1;">謝謝聆聽</h1>
+        <p class="reveal" style="color:rgba(26,26,26,0.7);font-size:var(--h3-size);margin-top:0.5em;font-weight:500;">Swapfiets 循環經濟商業模式設計</p>
+    </div>
+</section>
+
+</body>
+</html>
