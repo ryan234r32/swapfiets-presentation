@@ -175,6 +175,9 @@ p {
     color: var(--text-muted);
     margin-bottom: clamp(0.5rem, 1.5vw, 1.5rem);
     flex-shrink: 0;
+    align-self: flex-start;
+    writing-mode: horizontal-tb;
+    white-space: nowrap;
 }
 
 .section-tag span {
@@ -1087,11 +1090,6 @@ img { max-width: 100%; }
 <section class="slide" style="background:url('images/bike_graveyard.jpg') center/cover no-repeat;">
     <div style="position:absolute;inset:0;background:rgba(0,0,0,0.6);z-index:1;"></div>
     <div class="slide-content" style="position:relative;z-index:2;align-items:center;text-align:center;justify-content:center;">
-        <div class="section-tag" style="color:rgba(255,255,255,0.7);">
-            <span style="background:var(--danger)"></span>
-            <span style="color:rgba(255,255,255,0.7);">Q1 問題背景</span>
-        </div>
-
         <h2 style="color:#fff;font-size:var(--h2-size);">
             「解決問題的設計，反而製造了更大的問題」
         </h2>
